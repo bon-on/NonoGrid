@@ -1,0 +1,44 @@
+{
+  "version": "1",
+  "repoName": "NonoGrid",
+  "description": "Harness engineering kit for spec-driven, ADR-aware AI-assisted delivery.",
+  "policyMode": "warn-block-critical",
+  "stackSummary": "No known stack profile detected",
+  "sourcePriority": [
+    "feature spec",
+    "related adr",
+    "repo constraints",
+    "golden rules",
+    "general repo context"
+  ],
+  "detectedProfiles": [],
+  "suggestedPacks": [],
+  "approvedPacks": [],
+  "detectedSignals": [],
+  "paths": {
+    "rulesDir": "harness/rules",
+    "specsDir": "harness/specs",
+    "adrsDir": "harness/adrs",
+    "contractsDir": "harness/contracts",
+    "templatesDir": "harness/templates",
+    "reportsDir": "reports"
+  },
+  "requiredFiles": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "harness/workflow.md",
+    "harness/project.md",
+    "harness/maintenance.json",
+    "harness/rules/golden-rules.md",
+    "harness/rules/constraints.md",
+    "harness/templates/feature-spec.md",
+    "harness/templates/adr.md",
+    "harness/templates/contract.md"
+  ],
+  "criticalChecks": [
+    "manifest-present",
+    "golden-rules-present",
+    "constraints-present",
+    "feature-spec-has-acceptance"
+  ]
+}

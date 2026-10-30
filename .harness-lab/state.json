@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "version": "0.4.0",
+  "files": {
+    "AGENTS.md": "dbd8a85f48a69874597971cd3de8dc58c2d90290ae80e58d0976373e3c28d6e8",
+    "CLAUDE.md": "e874f7fd2922c423a80d816750e9e6292c2711cc2bc62e5c919eb5d06bb8b5c5",
+    "harness/workflow.md": "60144048936f771216dee11c329b12b1410007c8cca33e1723428f1192526ab0",
+    "harness/project.md": "078b7b31d7ac721d1f9152077e1d9d09393b7bdd1920a604ac353aae0a82d1c5",
+    ".claude/agents/code-reviewer.md": "e256bc0bbdd08ed5f6fe9c606e4ad6a8f324c18aac9267df064bff0741168f91",
+    "harness/maintenance.json": "cdd73f8efb4c8a16e287dca2fb1653d9c839e72f17565976d8f2297723166134",
+    "harness/manifest.json": "cb5054819f34067acef662bc353b3c90e459aa102d1be814097e4cec36befdcf",
+    "harness/rules/golden-rules.md": "7592110836aeb8ad0822f2a8ffbdf5d53347e8bc72a6213437776e23d413dd7f",
+    "harness/rules/constraints.md": "de9da7801f94a42402e838f3a9562b30bca70d89bbef758ef20d0c53f26841b8",
+    "harness/templates/feature-spec.md": "413e6f69e96a4eea2f9db66af707c72652079d7a84b0eceba10bf28bb7d65a67",
+    "harness/templates/adr.md": "60c177bdec5febd80af3c9dccc46cac993fcb4030bd30a33bb53c9f7153c9707",
+    "harness/templates/contract.md": "e7d36e04f5caa17017bd8be2abe563dfce83b4d8a0aa522d19b2e5bcaed1af6f",
+    "harness/specs/feature-harness-apply.md": "837917711788411237e2674d296d46e61ec293802c2f5ef4e0fff90dc20c828c",
+    "harness/adrs/adr-spec-driven-delivery.md": "0121b79b481fff7ba11e0536590191ed04475bd85310b0f5c7bbbafb1de2b2f9",
+    "harness/contracts/contract-harness-apply-foundation.md": "d2716d2362030d47682d3558a34b77e378b9dd25944d9ce364f4c3b34c021589",
+    "reports/repo-kit-audit-report.md": "ce6d84e4edd54b2a9f15e3061ca032e32a711769f0de2498c21084f3e5208060",
+    "reports/repo-kit-plan-report.md": "714bb49117d913840029c9a72a007a612e8dbb278831e45002f9117e92067582",
+    "reports/harness-apply-skill-note.md": "daa5a3ef778e54b5fafe30c7a2757481c2eb5ae0b4c738935663dc0336bf6f5a"
+  }
+}
