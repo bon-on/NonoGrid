@@ -22,8 +22,7 @@ perl -pi -e 's#<base href="/">#<base href="./">#' "$INDEX"
 fail() { echo "error: $1" >&2; exit 1; }
 
 # Glyphs Roboto lacks make Flutter fetch a fallback font from fonts.gstatic.com.
-if grep -rnP '[^\x00-\x7F]' lib --include='*.dart' >/dev/null; then
-  grep -rnP '[^\x00-\x7F]' lib --include='*.dart' >&2
+if find lib -name '*.dart' -print0 | xargs -0 perl -ne 'print "$ARGV:$.: $_" if /[^\x00-\x7F]/' | grep -q .; then
   fail "non-ASCII characters in lib/ may trigger external fallback font requests"
 fi
 
