@@ -205,4 +205,79 @@ void main() {
     await t.pump();
     expect(played, [Sfx.fill]);
   });
+
+  testWidgets('undo pressed during the winning stroke plays level_clear once', (
+    t,
+  ) async {
+    final played = await _launch(t);
+    final p = puzzleForLevel(1);
+    final n = p.size;
+    var lr = -1, lc = -1;
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        if (p.filledAt(r, c)) {
+          lr = r;
+          lc = c;
+        }
+      }
+    }
+    var cr = 0, cc = 0;
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        if (!p.filledAt(r, c) || (r == lr && c == lc)) continue;
+        while (cr < r) {
+          await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+          cr++;
+        }
+        while (cc < c) {
+          await t.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+          cc++;
+        }
+        while (cc > c) {
+          await t.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+          cc--;
+        }
+        await t.sendKeyEvent(LogicalKeyboardKey.space);
+      }
+    }
+    played.clear();
+    final paint = find.descendant(
+      of: find.byType(NonoBoard),
+      matching: find.byType(CustomPaint),
+    );
+    final box = t.getRect(paint.first);
+    // The grid is the bottom-right n x n square of the board paint.
+    final lb = t.getSize(
+      find
+          .descendant(
+            of: find.byType(NonoBoard),
+            matching: find.byType(LayoutBuilder),
+          )
+          .first,
+    );
+    final cl = p.clues;
+    var md = 1;
+    for (final line in [...cl.rows, ...cl.cols]) {
+      for (final v in line) {
+        if (v >= 10) md = 2;
+      }
+    }
+    final m = BoardMetrics.fit(
+      n: n,
+      rowSlots: cl.maxRowClueCount,
+      colSlots: cl.maxColClueCount,
+      maxDigits: md,
+      space: lb,
+    );
+    final pos =
+        box.bottomRight -
+        Offset((n - lc - 0.5) * m.cell, (n - lr - 0.5) * m.cell);
+    final g = await t.startGesture(pos);
+    await t.pump();
+    await t.sendKeyEvent(LogicalKeyboardKey.keyU);
+    await g.up();
+    await t.pump();
+    expect(played, [Sfx.levelClear]);
+    await t.pump(const Duration(seconds: 3));
+  });
 }
