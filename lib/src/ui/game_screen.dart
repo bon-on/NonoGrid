@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../logic/game.dart';
 import '../logic/puzzle.dart';
+import '../platform/game_platform.dart';
 import '../storage.dart';
 import 'board.dart';
 import 'how_to_play.dart';
@@ -16,9 +17,17 @@ String formatTime(int seconds) {
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.storage, this.tutorialStore});
+  const GameScreen({
+    super.key,
+    required this.storage,
+    this.tutorialStore,
+    this.platform = const NoopGamePlatform(),
+  });
 
   final GameStorage storage;
+
+  /// Receives gameplay start/stop events (CrazyGames SDK on portal builds).
+  final GamePlatform platform;
 
   /// Defaults to [PrefsTutorialStore].
   final TutorialStore? tutorialStore;
@@ -61,6 +70,21 @@ class _GameScreenState extends State<GameScreen>
 
   bool get _inputBlocked => !_tutorialChecked || _tutorialOpen;
 
+  // Whether the platform currently believes gameplay is running.
+  bool _gameplayActive = false;
+
+  /// Reports gameplay start/stop to the platform exactly on transitions.
+  void _syncGameplay() {
+    final wantActive = _tutorialChecked && !_tutorialOpen && !_game.isWon;
+    if (wantActive == _gameplayActive) return;
+    _gameplayActive = wantActive;
+    if (wantActive) {
+      widget.platform.gameplayStart();
+    } else {
+      widget.platform.gameplayStop();
+    }
+  }
+
   GameStorage get _storage => widget.storage;
   int get _elapsed => _baseSeconds + _clock.elapsed.inSeconds;
 
@@ -88,6 +112,7 @@ class _GameScreenState extends State<GameScreen>
       _tutorialChecked = true;
       if (!seen) _openTutorial();
     });
+    _syncGameplay();
   }
 
   /// Opens the tutorial at step 1 and pauses the clock. Call inside setState.
@@ -99,6 +124,7 @@ class _GameScreenState extends State<GameScreen>
       _resumeAfterTutorial = true;
       _saveProgress();
     }
+    _syncGameplay();
   }
 
   void _closeTutorial() {
@@ -107,6 +133,7 @@ class _GameScreenState extends State<GameScreen>
       if (_resumeAfterTutorial) _startClock();
       _resumeAfterTutorial = false;
     });
+    _syncGameplay();
     _focus.requestFocus();
     () async {
       try {
@@ -188,6 +215,7 @@ class _GameScreenState extends State<GameScreen>
     // Saved progress is kept: it belongs to one level and is restored when
     // that level is opened again, until a move on another level replaces it.
     setState(() => _load(level));
+    _syncGameplay();
   }
 
   // ---- Input ------------------------------------------------------------
@@ -245,6 +273,7 @@ class _GameScreenState extends State<GameScreen>
     if (_storage.progress?.level == _level) {
       unawaited(_storage.clearProgress());
     }
+    _syncGameplay();
   }
 
   void _check() {
@@ -271,6 +300,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _afterChange() {
+    _syncGameplay();
     if (_game.isWon) {
       _clock.stop();
       final seconds = _elapsed;

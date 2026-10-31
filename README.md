@@ -61,6 +61,10 @@ Pushing to `main` builds and deploys the web app to GitHub Pages via
 `.github/workflows/deploy-pages.yml` (enable Pages with "GitHub Actions" as
 the source in the repository settings).
 
+## CrazyGames build
+
+`tool/build_crazygames.sh` builds `build/nono-grid-crazygames.zip` for the CrazyGames portal (SDK gameplay events, no ads). See `docs/crazygames.md`.
+
 ## Project layout
 
 - `lib/src/logic/` - widget-free rules: clues, line/grid solver, seeded PRNG,
