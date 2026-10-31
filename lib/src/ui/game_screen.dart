@@ -326,9 +326,14 @@ class _GameScreenState extends State<GameScreen>
 
   void _undo() {
     if (!_game.canUndo) return;
-    setState(_game.undo);
+    var undone = false;
+    setState(() => undone = _game.undo());
     _afterChange();
-    _sfx.play(Sfx.undo);
+    if (_game.isWon) {
+      _sfx.play(Sfx.levelClear);
+    } else if (undone) {
+      _sfx.play(Sfx.undo);
+    }
   }
 
   void _restart() {

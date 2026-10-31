@@ -9,6 +9,7 @@ import 'package:nono_grid/src/audio/sound_mute_store.dart';
 import 'package:nono_grid/src/logic/puzzle.dart';
 import 'package:nono_grid/src/platform/game_platform.dart';
 import 'package:nono_grid/src/storage.dart';
+import 'package:nono_grid/src/ui/board.dart';
 import 'package:nono_grid/src/ui/how_to_play.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -184,6 +185,24 @@ void main() {
     await t.tap(find.byKey(const Key('sound-toggle')));
     await t.pump();
     await t.sendKeyEvent(LogicalKeyboardKey.space);
+    expect(played, [Sfx.fill]);
+  });
+
+  testWidgets('a drag stroke plays one sound at its end', (t) async {
+    final played = await _launch(t);
+    final paint = find.descendant(
+      of: find.byType(NonoBoard),
+      matching: find.byType(CustomPaint),
+    );
+    final box = t.getRect(paint.first);
+    final start = box.bottomRight - const Offset(10, 10);
+    final g = await t.startGesture(start);
+    await g.moveBy(const Offset(-40, 0));
+    await g.moveBy(const Offset(-40, 0));
+    await g.moveBy(const Offset(-40, 0));
+    expect(played, isEmpty);
+    await g.up();
+    await t.pump();
     expect(played, [Sfx.fill]);
   });
 }
