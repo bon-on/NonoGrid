@@ -18,6 +18,10 @@ abstract class GamePlatform {
   /// has no leaderboard or result upload; kept false for the same reason.
   bool get allowsResultRegistration => false;
 
+  /// Whether the portal asks the game to stay silent (CrazyGames SDK
+  /// `settings.muteAudio`). Combined with the player's own mute toggle.
+  bool get isAudioMuted => false;
+
   /// Prepares the portal SDK. Never throws; failures downgrade to no-op.
   Future<void> initialize();
 

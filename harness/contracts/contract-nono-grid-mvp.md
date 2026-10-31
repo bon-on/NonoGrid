@@ -6,6 +6,7 @@ related_specs:
   - feature-nono-grid-mvp
   - feature-how-to-play-tutorial
   - feature-game-hub-navigation
+  - feature-sound-effects
 evidence_files:
   - reports/nono-grid-mvp-verification.md
 ---

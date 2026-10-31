@@ -15,6 +15,7 @@ class CrazyGamesPlatform extends GamePlatform {
   static const Duration _initTimeout = Duration(seconds: 5);
 
   _Sdk? _sdk;
+  bool _settingsMuted = false;
 
   @override
   Future<void> initialize() async {
@@ -32,6 +33,7 @@ class CrazyGamesPlatform extends GamePlatform {
         return;
       }
       _sdk = sdk;
+      _watchSettings(sdk);
     } catch (error) {
       debugPrint('CrazyGames SDK init failed: $error');
       _sdk = null;
@@ -43,6 +45,25 @@ class CrazyGamesPlatform extends GamePlatform {
 
   @override
   void gameplayStop() => _call((sdk) => sdk.game.gameplayStop());
+
+  @override
+  bool get isAudioMuted => _settingsMuted;
+
+  /// Settings are optional: older SDK builds without them stay playable.
+  void _watchSettings(_Sdk sdk) {
+    try {
+      _applySettings(sdk.game.settings);
+      sdk.game.addSettingsChangeListener(
+        ((_Settings? settings) => _applySettings(settings)).toJS,
+      );
+    } catch (error) {
+      debugPrint('CrazyGames SDK settings unavailable: $error');
+    }
+  }
+
+  void _applySettings(_Settings? settings) {
+    _settingsMuted = settings?.muteAudio ?? false;
+  }
 
   void _call(void Function(_Sdk sdk) action) {
     final sdk = _sdk;
@@ -71,4 +92,10 @@ extension type _Sdk._(JSObject _) implements JSObject {
 extension type _GameModule._(JSObject _) implements JSObject {
   external void gameplayStart();
   external void gameplayStop();
+  external _Settings? get settings;
+  external void addSettingsChangeListener(JSFunction listener);
+}
+
+extension type _Settings._(JSObject _) implements JSObject {
+  external bool? get muteAudio;
 }

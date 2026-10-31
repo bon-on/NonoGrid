@@ -4,6 +4,7 @@ title: Use a build flag and a platform adapter for the CrazyGames build
 status: accepted
 related_specs:
   - feature-nono-grid-crazygames
+  - feature-sound-effects
 ---
 
 # ADR: Use a build flag and a platform adapter for the CrazyGames build

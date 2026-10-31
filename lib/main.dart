@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'src/audio/sound_fx.dart';
+import 'src/audio/sound_mute_store.dart';
 import 'src/platform/game_platform.dart';
 import 'src/storage.dart';
 import 'src/ui/board.dart';
@@ -26,11 +28,15 @@ class NonoGridApp extends StatelessWidget {
     required this.storage,
     this.tutorialStore,
     this.platform = const NoopGamePlatform(),
+    this.soundMuteStore = const SoundMuteStore(),
+    this.onSfxPlayed,
   });
 
   final GameStorage storage;
   final TutorialStore? tutorialStore;
   final GamePlatform platform;
+  final SoundMuteStore soundMuteStore;
+  final void Function(Sfx sfx)? onSfxPlayed;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +54,8 @@ class NonoGridApp extends StatelessWidget {
         storage: storage,
         tutorialStore: tutorialStore,
         platform: platform,
+        soundMuteStore: soundMuteStore,
+        onSfxPlayed: onSfxPlayed,
       ),
     );
   }

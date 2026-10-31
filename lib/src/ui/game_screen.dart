@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../audio/sound_fx.dart';
+import '../audio/sound_mute_store.dart';
 import '../logic/game.dart';
 import '../logic/puzzle.dart';
 import '../platform/game_platform.dart';
@@ -31,12 +34,20 @@ class GameScreen extends StatefulWidget {
     required this.storage,
     this.tutorialStore,
     this.platform = const NoopGamePlatform(),
+    this.soundMuteStore = const SoundMuteStore(),
+    this.onSfxPlayed,
   });
 
   final GameStorage storage;
 
   /// Receives gameplay start/stop events (CrazyGames SDK on portal builds).
   final GamePlatform platform;
+
+  /// Persisted user mute choice; tests inject a fake.
+  final SoundMuteStore soundMuteStore;
+
+  /// Called for every sound that is actually played (not muted); for tests.
+  final void Function(Sfx sfx)? onSfxPlayed;
 
   /// Defaults to [PrefsTutorialStore].
   final TutorialStore? tutorialStore;
@@ -77,6 +88,18 @@ class _GameScreenState extends State<GameScreen>
   late final TutorialStore _tutorialStore =
       widget.tutorialStore ?? PrefsTutorialStore();
 
+  // User sound toggle; effective mute also includes the platform mute.
+  bool _soundMuted = false;
+  bool _soundTouched = false;
+  late final SoundFx _sfx = SoundFx(
+    isMuted: () => _soundMuted || widget.platform.isAudioMuted,
+    onPlay: widget.onSfxPlayed,
+  );
+
+  // Board snapshot and tool of the stroke in progress, for its one sound.
+  List<Mark>? _strokeBefore;
+  Tool _strokeTool = Tool.fill;
+
   bool get _inputBlocked => !_tutorialChecked || _tutorialOpen;
 
   // Whether the platform currently believes gameplay is running.
@@ -107,6 +130,38 @@ class _GameScreenState extends State<GameScreen>
       if (_clock.isRunning && mounted) setState(() {});
     });
     _checkTutorial();
+    _loadSoundMuted();
+  }
+
+  Future<void> _loadSoundMuted() async {
+    var muted = false;
+    try {
+      muted = await widget.soundMuteStore.loadMuted();
+    } catch (_) {}
+    if (!mounted || _soundTouched) return;
+    setState(() => _soundMuted = muted);
+  }
+
+  void _toggleSound() {
+    _soundTouched = true;
+    final muted = !_soundMuted;
+    setState(() => _soundMuted = muted);
+    () async {
+      try {
+        await widget.soundMuteStore.saveMuted(muted);
+      } catch (_) {}
+    }();
+    _focus.requestFocus();
+  }
+
+  /// Plays the one sound of a finished fill/mark action: level_clear on a
+  /// win, otherwise fill or mark when the board changed.
+  void _playChange(List<Mark>? before, Tool tool) {
+    if (_game.isWon) {
+      _sfx.play(Sfx.levelClear);
+    } else if (before != null && !listEquals(before, _game.cells)) {
+      _sfx.play(tool == Tool.fill ? Sfx.fill : Sfx.mark);
+    }
   }
 
   Future<void> _checkTutorial() async {
@@ -171,6 +226,7 @@ class _GameScreenState extends State<GameScreen>
     _messageTimer?.cancel();
     _reveal.dispose();
     _focus.dispose();
+    _sfx.dispose();
     super.dispose();
   }
 
@@ -237,6 +293,8 @@ class _GameScreenState extends State<GameScreen>
     if (_game.isWon || _inputBlocked) return;
     _focus.requestFocus();
     _startClock();
+    _strokeBefore = List<Mark>.of(_game.cells);
+    _strokeTool = tool;
     setState(() {
       _showCursor = false;
       _cursor = (r, c);
@@ -253,19 +311,24 @@ class _GameScreenState extends State<GameScreen>
     if (!_game.isStroking) return;
     setState(_game.endStroke);
     _afterChange();
+    _playChange(_strokeBefore, _strokeTool);
+    _strokeBefore = null;
   }
 
   void _tapAtCursor(Tool tool) {
     if (_game.isWon) return;
     _startClock();
+    final before = List<Mark>.of(_game.cells);
     setState(() => _game.tap(_cursor.$1, _cursor.$2, tool));
     _afterChange();
+    _playChange(before, tool);
   }
 
   void _undo() {
     if (!_game.canUndo) return;
     setState(_game.undo);
     _afterChange();
+    _sfx.play(Sfx.undo);
   }
 
   void _restart() {
@@ -558,9 +621,22 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
             IconButton(
+              key: const Key('sound-toggle'),
+              tooltip: _soundMuted ? 'Sound off' : 'Sound on',
+              color: NonoColors.paper,
+              visualDensity: VisualDensity.compact,
+              onPressed: _toggleSound,
+              icon: Icon(
+                _soundMuted
+                    ? Icons.volume_off_rounded
+                    : Icons.volume_up_rounded,
+              ),
+            ),
+            IconButton(
               key: const Key('how-to-play-button'),
               tooltip: 'How to play',
               color: NonoColors.paper,
+              visualDensity: VisualDensity.compact,
               onPressed: () => setState(_openTutorial),
               icon: const Icon(Icons.help_outline),
             ),

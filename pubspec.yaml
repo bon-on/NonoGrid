@@ -57,6 +57,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  assets:
+    - assets/audio/
+
   # Roboto is bundled so the web build never fetches it from fonts.gstatic.com
   # (portals such as GamePix forbid external requests). License: assets/fonts/Roboto_LICENSE.txt
   fonts:

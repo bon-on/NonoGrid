@@ -4,6 +4,7 @@ title: Deliver the NonoGrid CrazyGames web bundle
 status: active
 related_specs:
   - feature-nono-grid-crazygames
+  - feature-sound-effects
 evidence_files:
   - docs/crazygames.md
   - reports/nono-grid-crazygames-verification.md
