@@ -35,6 +35,33 @@
   <link rel="manifest" href="manifest.json">
   <style>body { background-color: #161925; }</style>
   <style>
+    :root { --games-nav-height: calc(48px + env(safe-area-inset-top)); }
+    /* Flutter renders into this host, which starts below the nav bar. */
+    #flutter-host {
+      position: fixed;
+      inset: var(--games-nav-height) 0 0 0;
+    }
+    .games-nav-bar {
+      position: fixed;
+      z-index: 2147483647;
+      inset: 0 0 auto;
+      height: var(--games-nav-height);
+      padding: env(safe-area-inset-top) 12px 0;
+      display: flex;
+      align-items: center;
+      background: #161925;
+      border-bottom: 1px solid rgba(255, 255, 255, .08);
+      box-sizing: border-box;
+    }
+    .games-home-link {
+      padding: 8px 12px;
+      border-radius: 999px;
+      color: white;
+      background: rgba(255, 255, 255, .1);
+      font: 600 14px/1.2 system-ui, sans-serif;
+      text-decoration: none;
+    }
+    .games-home-link:focus-visible { outline: 3px solid #d4af37; outline-offset: 2px; }
     html, body {
       margin: 0;
       height: 100%;
@@ -47,7 +74,7 @@
     }
     #loader {
       position: fixed;
-      inset: 0;
+      inset: var(--games-nav-height) 0 0 0;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -72,6 +99,9 @@
   </style>
 </head>
 <body>
+  <nav class="games-nav-bar" aria-label="게임 내비게이션">
+    <a class="games-home-link" href="https://bon-on.github.io/" aria-label="게임 선택 화면으로 돌아가기">← 게임 목록</a>
+  </nav>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -99,6 +129,7 @@
       setTimeout(hide, 15000);
     })();
   </script>
+  <div id="flutter-host"></div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

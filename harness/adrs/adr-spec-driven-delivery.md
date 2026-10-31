@@ -6,6 +6,7 @@ related_specs:
   - feature-harness-apply
   - feature-nono-grid-mvp
   - feature-how-to-play-tutorial
+  - feature-game-hub-navigation
 ---
 
 # ADR: Make feature specs and ADRs the top AI source of truth
