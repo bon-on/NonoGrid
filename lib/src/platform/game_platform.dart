@@ -6,8 +6,17 @@ import 'game_platform_factory_stub.dart'
 ///
 /// Mobile and plain web builds use [NoopGamePlatform]; CrazyGames web builds
 /// (`--dart-define=CRAZYGAMES=true`) use the SDK-backed implementation.
+/// GamePix web builds (`--dart-define=GAMEPIX=true`) use the no-op platform.
 abstract class GamePlatform {
   const GamePlatform();
+
+  /// Whether the game may show ads. This game has none; kept false so a
+  /// portal build can never enable them by accident.
+  bool get allowsAds => false;
+
+  /// Whether finished results may be sent to an external service. This game
+  /// has no leaderboard or result upload; kept false for the same reason.
+  bool get allowsResultRegistration => false;
 
   /// Prepares the portal SDK. Never throws; failures downgrade to no-op.
   Future<void> initialize();

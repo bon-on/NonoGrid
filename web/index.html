@@ -17,6 +17,7 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="NonoGrid: a nonogram logic puzzle with generated, line-solvable levels.">
 
@@ -44,6 +45,30 @@
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
     }
+    #loader {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: #161925;
+      color: #F1F5F9;
+      font-family: Roboto, Arial, sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      z-index: 1;
+    }
+    #loader .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #F1F5F9;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -55,6 +80,24 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <div id="loader"><div class="spinner"></div><div>NonoGrid</div></div>
+  <script>
+    // Remove the loader once Flutter has rendered its first frame.
+    (function () {
+      var done = false;
+      function hide() {
+        if (done) return;
+        done = true;
+        var el = document.getElementById('loader');
+        if (el) el.remove();
+      }
+      window.addEventListener('flutter-first-frame', hide);
+      document.addEventListener('flutter-first-frame', hide);
+      new MutationObserver(function () {
+        if (document.querySelector('flt-glass-pane')) setTimeout(hide, 300);
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

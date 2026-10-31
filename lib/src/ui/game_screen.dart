@@ -472,8 +472,8 @@ class _GameScreenState extends State<GameScreen>
   String _hint(BuildContext context) {
     if (_game.isWon) return 'Press Next or Enter for the next puzzle';
     return MediaQuery.sizeOf(context).width >= 700
-        ? 'Drag to paint  ·  Right-click: X  ·  Arrows, Space, X, U undo, R restart'
-        : 'Tap or drag to paint  ·  Switch to X to mark empty cells';
+        ? 'Drag to paint  -  Right-click: X  -  Arrows, Space, X, U undo, R restart'
+        : 'Tap or drag to paint  -  Switch to X to mark empty cells';
   }
 
   Widget _topBar() {

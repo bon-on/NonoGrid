@@ -65,6 +65,14 @@ the source in the repository settings).
 
 `tool/build_crazygames.sh` builds `build/nono-grid-crazygames.zip` for the CrazyGames portal (SDK gameplay events, no ads). See `docs/crazygames.md`.
 
+## GamePix build
+
+`tool/build_gamepix.sh` builds `build/nono-grid-gamepix.zip` for GamePix (no portal SDK, no ads, relative resources). See `docs/gamepix.md`.
+
+## Fonts
+
+Roboto (Regular, Medium, Bold, Black) is bundled in `assets/fonts/` so web builds never fetch it from fonts.gstatic.com. Roboto is licensed under Apache 2.0, see `assets/fonts/Roboto_LICENSE.txt`.
+
 ## Project layout
 
 - `lib/src/logic/` - widget-free rules: clues, line/grid solver, seeded PRNG,
