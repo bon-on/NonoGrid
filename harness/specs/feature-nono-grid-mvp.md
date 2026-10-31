@@ -95,3 +95,6 @@ ambiguous (more than one picture fits the clues).
 
 ## Evidence
 - reports/nono-grid-mvp-verification.md
+
+## Amendment: key auto-repeat
+Key auto-repeat only moves the cursor with the arrow keys; Space, X, U, R and Enter act once per key press.

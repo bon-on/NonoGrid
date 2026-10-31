@@ -37,6 +37,8 @@ We want a short, skippable tutorial on the first launch only.
 - The puzzle clock does not count while it is open: opening it stops a running
   clock (and saves progress) and closing resumes it; on first launch the
   clock does not start until the player makes a move after closing it.
+- Tab, F5 and Ctrl/Meta/Alt shortcuts are left unhandled while it is open so
+  the browser keeps reload and focus behavior.
 - Storage failures never break play: a read failure shows the tutorial, a write
   failure just closes it.
 - Text is English.
