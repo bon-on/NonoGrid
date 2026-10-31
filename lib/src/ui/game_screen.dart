@@ -10,6 +10,15 @@ import '../storage.dart';
 import 'board.dart';
 import 'how_to_play.dart';
 
+/// Keys the browser owns (focus change, reload, Ctrl/Meta/Alt shortcuts) stay
+/// unhandled so the how-to-play card does not block them on web.
+bool _isBrowserShortcut(KeyEvent e) {
+  final k = e.logicalKey;
+  if (k == LogicalKeyboardKey.tab || k == LogicalKeyboardKey.f5) return true;
+  final kb = HardwareKeyboard.instance;
+  return kb.isControlPressed || kb.isMetaPressed || kb.isAltPressed;
+}
+
 String formatTime(int seconds) {
   final m = seconds ~/ 60;
   final s = seconds % 60;
@@ -316,6 +325,7 @@ class _GameScreenState extends State<GameScreen>
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (_tutorialOpen) {
+      if (_isBrowserShortcut(event)) return KeyEventResult.ignored;
       if (event is KeyDownEvent) {
         final k = event.logicalKey;
         if (k == LogicalKeyboardKey.enter ||
@@ -337,6 +347,15 @@ class _GameScreenState extends State<GameScreen>
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
+    // Auto-repeat only moves the cursor; actions need a fresh key press so a
+    // held Enter/Space from the tutorial cannot paint after it closes.
+    if (event is KeyRepeatEvent &&
+        key != LogicalKeyboardKey.arrowUp &&
+        key != LogicalKeyboardKey.arrowDown &&
+        key != LogicalKeyboardKey.arrowLeft &&
+        key != LogicalKeyboardKey.arrowRight) {
+      return KeyEventResult.ignored;
+    }
     final n = _game.size;
     void move(int dr, int dc) => setState(() {
       _showCursor = true;

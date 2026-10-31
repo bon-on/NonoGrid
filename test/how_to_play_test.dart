@@ -235,4 +235,54 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
+  testWidgets('browser keys and shortcuts stay unhandled while open', (
+    t,
+  ) async {
+    final seen = <LogicalKeyboardKey>[];
+    t.view.physicalSize = const Size(1280, 720);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    final s = await GameStorage.open();
+    await t.pumpWidget(
+      Focus(
+        onKeyEvent: (_, e) {
+          if (e is KeyDownEvent) seen.add(e.logicalKey);
+          return KeyEventResult.ignored;
+        },
+        child: NonoGridApp(
+          key: UniqueKey(),
+          storage: s,
+          tutorialStore: MemoryTutorialStore(),
+        ),
+      ),
+    );
+    await t.pump();
+    await t.pump();
+
+    await t.sendKeyEvent(LogicalKeyboardKey.f5);
+    await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await t.pump();
+    expect(seen, contains(LogicalKeyboardKey.f5));
+    expect(seen, contains(LogicalKeyboardKey.enter));
+    expect(_overlay, findsOneWidget, reason: 'Ctrl+Enter must not advance');
+    expect(_stepText(t), nonoGridSteps.first.text);
+  });
+
+  testWidgets('key repeat does not paint after the card closes', (t) async {
+    final s = await _launch(t, MemoryTutorialStore());
+    // Space is held while the card is open, then the card closes.
+    await t.sendKeyDownEvent(LogicalKeyboardKey.space);
+    await t.tap(find.byKey(const Key('how-to-play-skip')));
+    await t.pump();
+    await t.sendKeyRepeatEvent(LogicalKeyboardKey.space);
+    await t.pump();
+    expect(s.progress, isNull);
+    await t.sendKeyUpEvent(LogicalKeyboardKey.space);
+    await t.sendKeyEvent(LogicalKeyboardKey.space);
+    await t.pump();
+    expect(s.progress, isNotNull, reason: 'a fresh press still paints');
+  });
 }
