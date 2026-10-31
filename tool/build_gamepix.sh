@@ -21,6 +21,12 @@ perl -pi -e 's#<base href="/">#<base href="./">#' "$INDEX"
 
 fail() { echo "error: $1" >&2; exit 1; }
 
+# Glyphs Roboto lacks make Flutter fetch a fallback font from fonts.gstatic.com.
+if grep -rnP '[^\x00-\x7F]' lib --include='*.dart' >/dev/null; then
+  grep -rnP '[^\x00-\x7F]' lib --include='*.dart' >&2
+  fail "non-ASCII characters in lib/ may trigger external fallback font requests"
+fi
+
 grep -q '<base href="./">' "$INDEX" || fail "relative base href missing"
 grep -q -e 'user-select: none' "$INDEX" || fail "user-select rule missing from index.html"
 grep -q -e 'user-scalable=no' "$INDEX" || fail "viewport user-scalable=no missing"
@@ -34,7 +40,7 @@ grep -q '"family":"Roboto"' "$OUT/assets/FontManifest.json" || fail "Roboto miss
 find "$OUT" -name '*.symbols' -delete
 
 (cd "$OUT" && zip -qr "$ZIP" .)
-unzip -l "$ZIP" | awk '{print $4}' | grep -qx 'index.html' || fail "index.html is not at the zip root"
+unzip -Z1 "$ZIP" | grep -qx 'index.html' || fail "index.html is not at the zip root"
 
 file_count=$(find "$OUT" -type f | wc -l | tr -d ' ')
 total_kb=$(du -sk "$OUT" | cut -f1)

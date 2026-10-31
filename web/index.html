@@ -85,17 +85,18 @@
     // Remove the loader once Flutter has rendered its first frame.
     (function () {
       var done = false;
+      var observer = null;
       function hide() {
         if (done) return;
         done = true;
+        if (observer) observer.disconnect();
         var el = document.getElementById('loader');
         if (el) el.remove();
       }
       window.addEventListener('flutter-first-frame', hide);
       document.addEventListener('flutter-first-frame', hide);
-      new MutationObserver(function () {
-        if (document.querySelector('flt-glass-pane')) setTimeout(hide, 300);
-      }).observe(document.documentElement, { childList: true, subtree: true });
+      // Safety net in case the event is missed.
+      setTimeout(hide, 15000);
     })();
   </script>
   <script src="flutter_bootstrap.js" async></script>

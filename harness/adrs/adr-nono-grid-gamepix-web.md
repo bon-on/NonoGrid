@@ -28,4 +28,4 @@ from fonts.gstatic.com unless a Roboto family is bundled.
 
 ## Consequences
 - Pages, CrazyGames and GamePix builds share one codebase.
-- The app grows by about 0.5MB for the Roboto files.
+- The app grows by about 0.7MB (also in mobile builds, which supersedes the "mobile unchanged" wording of the CrazyGames contract) for the Roboto files.

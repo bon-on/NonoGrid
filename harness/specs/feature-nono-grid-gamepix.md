@@ -38,6 +38,10 @@ can be uploaded to GamePix as is.
   `FontManifest.json`.
 - Progress is stored in localStorage through shared_preferences, which GamePix
   syncs automatically. No code is needed (see `docs/gamepix.md`).
+- UI strings use only characters Roboto covers (ASCII). `tool/build_gamepix.sh`
+  fails on non-ASCII characters in `lib/**/*.dart`, because a missing glyph makes
+  Flutter fetch a fallback font from fonts.gstatic.com.
+  NonoGrid: the U+00B7 separators in the hint line were replaced by `-`.
 
 Out of scope: GamePix SDK integration, ads, gameplay changes, portal submission.
 
