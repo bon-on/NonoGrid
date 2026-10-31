@@ -33,6 +33,10 @@ mark along the stroke instead. **Check** briefly highlights wrong fills; there
 is no penalty (free mode). The timer starts on your first move and best times
 are kept per level.
 
+The first launch shows a skippable "How to play" card (Enter/Space next, Esc
+skip, arrows move between steps); the `?` button in the top bar reopens it and
+the timer is paused while it is open.
+
 ### Levels
 
 - Levels 1-3 are small hand-made pictures.

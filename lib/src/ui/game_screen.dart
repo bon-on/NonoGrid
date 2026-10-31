@@ -7,6 +7,7 @@ import '../logic/game.dart';
 import '../logic/puzzle.dart';
 import '../storage.dart';
 import 'board.dart';
+import 'how_to_play.dart';
 
 String formatTime(int seconds) {
   final m = seconds ~/ 60;
@@ -15,9 +16,12 @@ String formatTime(int seconds) {
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.storage});
+  const GameScreen({super.key, required this.storage, this.tutorialStore});
 
   final GameStorage storage;
+
+  /// Defaults to [PrefsTutorialStore].
+  final TutorialStore? tutorialStore;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -47,6 +51,16 @@ class _GameScreenState extends State<GameScreen>
   );
   final FocusNode _focus = FocusNode(debugLabel: 'board');
 
+  // Input and the clock stay blocked until the tutorial flag has been read.
+  bool _tutorialChecked = false;
+  bool _tutorialOpen = false;
+  int _tutorialStep = 0;
+  bool _resumeAfterTutorial = false;
+  late final TutorialStore _tutorialStore =
+      widget.tutorialStore ?? PrefsTutorialStore();
+
+  bool get _inputBlocked => !_tutorialChecked || _tutorialOpen;
+
   GameStorage get _storage => widget.storage;
   int get _elapsed => _baseSeconds + _clock.elapsed.inSeconds;
 
@@ -59,6 +73,58 @@ class _GameScreenState extends State<GameScreen>
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (_clock.isRunning && mounted) setState(() {});
     });
+    _checkTutorial();
+  }
+
+  Future<void> _checkTutorial() async {
+    var seen = false;
+    try {
+      seen = await _tutorialStore.isSeen();
+    } catch (_) {
+      seen = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _tutorialChecked = true;
+      if (!seen) _openTutorial();
+    });
+  }
+
+  /// Opens the tutorial at step 1 and pauses the clock. Call inside setState.
+  void _openTutorial() {
+    _tutorialOpen = true;
+    _tutorialStep = 0;
+    if (_clock.isRunning) {
+      _clock.stop();
+      _resumeAfterTutorial = true;
+      _saveProgress();
+    }
+  }
+
+  void _closeTutorial() {
+    setState(() {
+      _tutorialOpen = false;
+      if (_resumeAfterTutorial) _startClock();
+      _resumeAfterTutorial = false;
+    });
+    _focus.requestFocus();
+    () async {
+      try {
+        await _tutorialStore.markSeen();
+      } catch (_) {}
+    }();
+  }
+
+  void _tutorialNext() {
+    if (_tutorialStep >= nonoGridSteps.length - 1) {
+      _closeTutorial();
+    } else {
+      setState(() => _tutorialStep++);
+    }
+  }
+
+  void _tutorialPrev() {
+    if (_tutorialStep > 0) setState(() => _tutorialStep--);
   }
 
   @override
@@ -77,7 +143,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      if (_wasRunning) _startClock();
+      if (_wasRunning && !_tutorialOpen) _startClock();
       _wasRunning = false;
     } else if (_clock.isRunning) {
       _wasRunning = true;
@@ -127,11 +193,11 @@ class _GameScreenState extends State<GameScreen>
   // ---- Input ------------------------------------------------------------
 
   void _startClock() {
-    if (!_clock.isRunning && !_game.isWon) _clock.start();
+    if (!_clock.isRunning && !_game.isWon && !_inputBlocked) _clock.start();
   }
 
   void _onStrokeStart(int r, int c, Tool tool) {
-    if (_game.isWon) return;
+    if (_game.isWon || _inputBlocked) return;
     _focus.requestFocus();
     _startClock();
     setState(() {
@@ -219,6 +285,24 @@ class _GameScreenState extends State<GameScreen>
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (_tutorialOpen) {
+      if (event is KeyDownEvent) {
+        final k = event.logicalKey;
+        if (k == LogicalKeyboardKey.enter ||
+            k == LogicalKeyboardKey.numpadEnter ||
+            k == LogicalKeyboardKey.space) {
+          _tutorialNext();
+        } else if (k == LogicalKeyboardKey.arrowRight) {
+          if (_tutorialStep < nonoGridSteps.length - 1) _tutorialNext();
+        } else if (k == LogicalKeyboardKey.arrowLeft) {
+          _tutorialPrev();
+        } else if (k == LogicalKeyboardKey.escape) {
+          _closeTutorial();
+        }
+      }
+      return KeyEventResult.handled;
+    }
+    if (_inputBlocked) return KeyEventResult.ignored;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
@@ -275,48 +359,61 @@ class _GameScreenState extends State<GameScreen>
       child: ExcludeFocus(
         child: Scaffold(
           backgroundColor: NonoColors.background,
-          body: SafeArea(
-            child: Column(
-              children: [
-                _topBar(),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                    child: NonoBoard(
-                      game: _game,
-                      tool: _tool,
-                      cursor: _cursor,
-                      showCursor: _showCursor,
-                      reveal: _reveal,
-                      revealColor: _revealColor,
-                      mistakes: _mistakes,
-                      onStrokeStart: _onStrokeStart,
-                      onStrokeMove: _onStrokeMove,
-                      onStrokeEnd: _onStrokeEnd,
+          body: Stack(
+            children: [
+              SafeArea(
+                child: Column(
+                  children: [
+                    _topBar(),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                        child: NonoBoard(
+                          game: _game,
+                          tool: _tool,
+                          cursor: _cursor,
+                          showCursor: _showCursor,
+                          reveal: _reveal,
+                          revealColor: _revealColor,
+                          mistakes: _mistakes,
+                          onStrokeStart: _onStrokeStart,
+                          onStrokeMove: _onStrokeMove,
+                          onStrokeEnd: _onStrokeEnd,
+                        ),
+                      ),
                     ),
+                    SizedBox(
+                      height: 24,
+                      child: Text(
+                        _message ?? _hint(context),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _message != null
+                              ? NonoColors.accent
+                              : NonoColors.paper.withValues(alpha: 0.45),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: _game.isWon ? _winBar() : _toolBar(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+              if (_tutorialOpen)
+                Positioned.fill(
+                  child: HowToPlayOverlay(
+                    steps: nonoGridSteps,
+                    step: _tutorialStep,
+                    onNext: _tutorialNext,
+                    onSkip: _closeTutorial,
                   ),
                 ),
-                SizedBox(
-                  height: 24,
-                  child: Text(
-                    _message ?? _hint(context),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: _message != null
-                          ? NonoColors.accent
-                          : NonoColors.paper.withValues(alpha: 0.45),
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: _game.isWon ? _winBar() : _toolBar(),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -410,6 +507,13 @@ class _GameScreenState extends State<GameScreen>
                   ],
                 ),
               ),
+            ),
+            IconButton(
+              key: const Key('how-to-play-button'),
+              tooltip: 'How to play',
+              color: NonoColors.paper,
+              onPressed: () => setState(_openTutorial),
+              icon: const Icon(Icons.help_outline),
             ),
           ],
         ),

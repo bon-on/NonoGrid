@@ -5,6 +5,7 @@ status: accepted
 related_specs:
   - feature-harness-apply
   - feature-nono-grid-mvp
+  - feature-how-to-play-tutorial
 ---
 
 # ADR: Make feature specs and ADRs the top AI source of truth

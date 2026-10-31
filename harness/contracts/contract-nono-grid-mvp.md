@@ -4,6 +4,7 @@ title: Deliver the NonoGrid MVP with line-solvable generated levels
 status: active
 related_specs:
   - feature-nono-grid-mvp
+  - feature-how-to-play-tutorial
 evidence_files:
   - reports/nono-grid-mvp-verification.md
 ---

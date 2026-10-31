@@ -5,7 +5,10 @@ import 'package:nono_grid/main.dart';
 import 'package:nono_grid/src/logic/puzzle.dart';
 import 'package:nono_grid/src/storage.dart';
 import 'package:nono_grid/src/ui/board.dart';
+import 'package:nono_grid/src/ui/how_to_play.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+MemoryTutorialStore seen() => MemoryTutorialStore(seen: true);
 
 void main() {
   Future<GameStorage> storage([Map<String, Object> values = const {}]) async {
@@ -18,7 +21,9 @@ void main() {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(NonoGridApp(storage: await storage()));
+      await tester.pumpWidget(
+        NonoGridApp(storage: await storage(), tutorialStore: seen()),
+      );
       await tester.pump();
       expect(find.text('NonoGrid'), findsOneWidget);
       expect(find.text('Level 1'), findsOneWidget);
@@ -34,7 +39,10 @@ void main() {
       addTearDown(tester.view.reset);
       // Level 50 is 15x15 and has a two-digit clue (12).
       await tester.pumpWidget(
-        NonoGridApp(storage: await storage({'level': 50, 'maxCleared': 49})),
+        NonoGridApp(
+          storage: await storage({'level': 50, 'maxCleared': 49}),
+          tutorialStore: seen(),
+        ),
       );
       await tester.pump();
       expect(find.text('Level 50'), findsOneWidget);
@@ -57,7 +65,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final s = await storage();
-    await tester.pumpWidget(NonoGridApp(storage: s));
+    await tester.pumpWidget(NonoGridApp(storage: s, tutorialStore: seen()));
     await tester.pump();
     final paint = find.descendant(
       of: find.byType(NonoBoard),
@@ -79,7 +87,7 @@ void main() {
       'progressCells': '#${'.' * 24}',
       'progressElapsed': 65,
     });
-    await tester.pumpWidget(NonoGridApp(storage: s));
+    await tester.pumpWidget(NonoGridApp(storage: s, tutorialStore: seen()));
     await tester.pump();
     expect(find.text('Level 2'), findsOneWidget);
     expect(find.text('1:05'), findsOneWidget);
@@ -92,7 +100,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final s = await storage();
-    await tester.pumpWidget(NonoGridApp(storage: s));
+    await tester.pumpWidget(NonoGridApp(storage: s, tutorialStore: seen()));
     await tester.pump();
     final p = puzzleForLevel(1);
     var cr = 0, cc = 0;

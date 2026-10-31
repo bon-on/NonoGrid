@@ -4,6 +4,7 @@ title: Generate levels from seeded random grids accepted only when line logic so
 status: accepted
 related_specs:
   - feature-nono-grid-mvp
+  - feature-how-to-play-tutorial
 ---
 
 # ADR: Generate levels from seeded random grids accepted only when line logic solves them

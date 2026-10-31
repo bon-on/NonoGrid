@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'src/storage.dart';
 import 'src/ui/board.dart';
 import 'src/ui/game_screen.dart';
+import 'src/ui/how_to_play.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,9 +18,10 @@ Future<void> main() async {
 }
 
 class NonoGridApp extends StatelessWidget {
-  const NonoGridApp({super.key, required this.storage});
+  const NonoGridApp({super.key, required this.storage, this.tutorialStore});
 
   final GameStorage storage;
+  final TutorialStore? tutorialStore;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,7 @@ class NonoGridApp extends StatelessWidget {
         ),
         scaffoldBackgroundColor: NonoColors.background,
       ),
-      home: GameScreen(storage: storage),
+      home: GameScreen(storage: storage, tutorialStore: tutorialStore),
     );
   }
 }
