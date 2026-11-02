@@ -5,6 +5,7 @@ status: active
 related_specs:
   - feature-nono-grid-crazygames
   - feature-sound-effects
+  - feature-retention-polish
 evidence_files:
   - docs/crazygames.md
   - reports/nono-grid-crazygames-verification.md

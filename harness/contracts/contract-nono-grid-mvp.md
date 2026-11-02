@@ -7,6 +7,7 @@ related_specs:
   - feature-how-to-play-tutorial
   - feature-game-hub-navigation
   - feature-sound-effects
+  - feature-retention-polish
 evidence_files:
   - reports/nono-grid-mvp-verification.md
 ---

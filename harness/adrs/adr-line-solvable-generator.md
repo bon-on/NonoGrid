@@ -5,6 +5,7 @@ status: accepted
 related_specs:
   - feature-nono-grid-mvp
   - feature-how-to-play-tutorial
+  - feature-retention-polish
 ---
 
 # ADR: Generate levels from seeded random grids accepted only when line logic solves them
