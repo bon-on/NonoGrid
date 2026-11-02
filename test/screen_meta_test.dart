@@ -8,6 +8,7 @@ import 'package:nono_grid/src/art/desk_scenery.dart';
 import 'package:nono_grid/src/art/paper_palette.dart';
 import 'package:nono_grid/src/art/picture_thumb.dart';
 import 'package:nono_grid/src/audio/sound_fx.dart';
+import 'package:nono_grid/src/audio/sound_mute_store.dart';
 import 'package:nono_grid/src/logic/game.dart';
 import 'package:nono_grid/src/logic/puzzle.dart';
 import 'package:nono_grid/src/meta/progress_rules.dart';
@@ -17,6 +18,13 @@ import 'package:nono_grid/src/ui/board.dart';
 import 'package:nono_grid/src/ui/board_fx.dart';
 import 'package:nono_grid/src/ui/how_to_play.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _MutedStore extends SoundMuteStore {
+  @override
+  Future<bool> loadMuted() async => true;
+  @override
+  Future<void> saveMuted(bool value) async {}
+}
 
 class _FakePlatform extends GamePlatform {
   final List<String> events = <String>[];
@@ -257,6 +265,107 @@ void main() {
     expect(find.text('Level 3'), findsOneWidget);
     expect(find.text('1:05'), findsOneWidget);
     expect(storage.stars(1), 1);
+  });
+
+  testWidgets('overlays pause the clock and resume it on close', (t) async {
+    // The clock is a real Stopwatch, so real time has to pass.
+    Future<void> wait(int ms) async {
+      await t.runAsync(() => Future<void>.delayed(Duration(milliseconds: ms)));
+      await t.pump(const Duration(milliseconds: 600));
+    }
+
+    await _launch(t);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyX);
+    await wait(1100);
+    expect(find.text('0:01'), findsOneWidget);
+    await t.tap(find.byKey(const Key('open-album')));
+    await t.pump();
+    await wait(1200);
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pump();
+    expect(find.text('0:01'), findsOneWidget, reason: 'paused while open');
+    await wait(1100);
+    expect(find.text('0:02'), findsOneWidget, reason: 'resumed on close');
+  });
+
+  testWidgets('opening a level from the map starts a fresh clock', (t) async {
+    await _launch(t, prefs: {'maxCleared': 2});
+    await t.sendKeyEvent(LogicalKeyboardKey.keyX);
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 1100)),
+    );
+    await t.tap(find.byKey(const Key('open-levels')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('map-node-2')));
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 1100)),
+    );
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.text('Level 2'), findsOneWidget);
+    expect(find.text('0:00'), findsOneWidget, reason: 'no move yet');
+  });
+
+  testWidgets('restart during the bloom opens no summary', (t) async {
+    await _launch(t);
+    await _solveLevel1(t);
+    await t.pump(const Duration(milliseconds: 300));
+    await t.sendKeyEvent(LogicalKeyboardKey.keyR);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('level-summary')), findsNothing);
+    expect(find.text('Undo'), findsOneWidget);
+  });
+
+  testWidgets('an overlay opened during the bloom defers the summary', (
+    t,
+  ) async {
+    await _launch(t);
+    await _solveLevel1(t);
+    await t.pump(const Duration(milliseconds: 300));
+    await t.tap(find.byKey(const Key('open-album')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('level-summary')), findsNothing);
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('level-summary')), findsOneWidget);
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pumpAndSettle();
+    expect(
+      find.byKey(const Key('level-summary')),
+      findsNothing,
+      reason: 'Esc keeps it closed',
+    );
+  });
+
+  testWidgets('a saved mute keeps native music from ever starting', (t) async {
+    const channel = MethodChannel('nono_grid/audio');
+    final calls = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          calls.add(call.method);
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+    t.view.physicalSize = const Size(1280, 720);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    SharedPreferences.setMockInitialValues({});
+    final storage = await GameStorage.open();
+    await t.pumpWidget(
+      NonoGridApp(
+        storage: storage,
+        tutorialStore: MemoryTutorialStore(seen: true),
+        soundMuteStore: _MutedStore(),
+      ),
+    );
+    await t.pump();
+    await t.pump();
+    expect(calls, isNot(contains('startLoop')));
+    await t.tap(find.byKey(const Key('sound-toggle')));
+    await t.pump();
+    expect(calls, contains('startLoop'));
   });
 
   for (final theme in NonoTheme.values) {

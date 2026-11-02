@@ -129,6 +129,13 @@ class _GameScreenState extends State<GameScreen>
   _Panel _panel = _Panel.none;
   ClearResult? _result;
   bool _revealDone = false;
+
+  /// The summary of the current win has been shown (Esc keeps it closed).
+  bool _summaryShown = false;
+
+  /// Bumped on every load/restart so a late recordClear result of an old
+  /// board is ignored.
+  int _boardGeneration = 0;
   int _mapPage = 0;
   int _mapSel = 1;
   NonoTheme _themeSel = NonoTheme.notebook;
@@ -180,7 +187,6 @@ class _GameScreenState extends State<GameScreen>
     _checkTutorial();
     _loadSoundMuted();
     widget.platform.setAudioMuteListener(_sfx.refreshMute);
-    _sfx.startMusic();
   }
 
   Future<void> _loadSoundMuted() async {
@@ -188,9 +194,11 @@ class _GameScreenState extends State<GameScreen>
     try {
       muted = await widget.soundMuteStore.loadMuted();
     } catch (_) {}
-    if (!mounted || _soundTouched) return;
-    setState(() => _soundMuted = muted);
-    _sfx.refreshMute();
+    if (!mounted) return;
+    if (!_soundTouched) setState(() => _soundMuted = muted);
+    // Music is requested only now, so native shells never start the loop
+    // for a player whose saved choice is "sound off".
+    _sfx.startMusic();
   }
 
   void _toggleSound() {
@@ -341,6 +349,7 @@ class _GameScreenState extends State<GameScreen>
     });
     _syncGameplay();
     _focus.requestFocus();
+    _maybeOpenSummary();
     () async {
       try {
         await _tutorialStore.markSeen();
@@ -383,6 +392,9 @@ class _GameScreenState extends State<GameScreen>
     });
     _syncGameplay();
     _focus.requestFocus();
+    // A win whose bloom ended while another overlay was open still gets
+    // its summary.
+    _maybeOpenSummary();
   }
 
   /// Leaves an overlay for another level (no clock resume for the old one).
@@ -411,10 +423,14 @@ class _GameScreenState extends State<GameScreen>
 
   void _maybeOpenSummary() {
     if (!mounted || !_revealDone || _result == null || !_game.isWon) return;
+    if (_summaryShown) return;
     if (_result!.level != _level || _panel != _Panel.none || _tutorialOpen) {
       return;
     }
-    setState(() => _panel = _Panel.summary);
+    setState(() {
+      _panel = _Panel.summary;
+      _summaryShown = true;
+    });
     _syncGameplay();
   }
 
@@ -470,6 +486,8 @@ class _GameScreenState extends State<GameScreen>
     _baseSeconds = 0;
     _reveal.value = 0;
     _revealDone = false;
+    _summaryShown = false;
+    _boardGeneration++;
     _result = null;
     _mistakes = {};
     _mistakeMade = false;
@@ -569,6 +587,8 @@ class _GameScreenState extends State<GameScreen>
       _baseSeconds = 0;
       _reveal.value = 0;
       _revealDone = false;
+      _summaryShown = false;
+      _boardGeneration++;
       _result = null;
       _mistakes = {};
       _mistakeMade = false;
@@ -616,10 +636,10 @@ class _GameScreenState extends State<GameScreen>
     if (_game.isWon) {
       _clock.stop();
       final seconds = _elapsed;
-      final level = _level;
+      final generation = _boardGeneration;
       unawaited(_storage.clearProgress());
-      _storage.recordClear(level, seconds, mistakes: _mistakeMade).then((r) {
-        if (!mounted || level != _level) return;
+      _storage.recordClear(_level, seconds, mistakes: _mistakeMade).then((r) {
+        if (!mounted || generation != _boardGeneration) return;
         setState(() => _result = r);
         _maybeOpenSummary();
       });
@@ -826,7 +846,15 @@ class _GameScreenState extends State<GameScreen>
             unlocked: _storage.unlocked,
             starsOf: _storage.stars,
             onSelect: _openLevelFromOverlay,
-            onPage: (page) => setState(() => _mapPage = math.max(0, page)),
+            onPage: (page) => setState(() {
+              _mapPage = math.max(0, page);
+              // Keep the keyboard selection on the visible page.
+              final first = _mapPage * kMapPageSize + 1;
+              _mapSel = _mapSel.clamp(
+                math.min(first, _storage.unlocked),
+                math.min(first + kMapPageSize - 1, _storage.unlocked),
+              );
+            }),
             onClose: _closePanel,
           ),
         ),
