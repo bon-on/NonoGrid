@@ -83,6 +83,7 @@ class ClearResult {
     required this.bestSeconds,
     required this.newBest,
     required this.stars,
+    required this.mistakes,
     required this.previousStars,
     required this.xpGained,
     required this.before,
@@ -95,6 +96,9 @@ class ClearResult {
   final int bestSeconds;
   final bool newBest;
   final int stars;
+
+  /// Whether Check found a wrong cell during this solve.
+  final bool mistakes;
   final int previousStars;
   final int xpGained;
   final PainterLevel before;

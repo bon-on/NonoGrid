@@ -284,6 +284,7 @@ class GameStorage {
       bestSeconds: newBest ? seconds : best,
       newBest: newBest,
       stars: stars,
+      mistakes: mistakes,
       previousStars: previousStars,
       xpGained: xpGained,
       before: before,

@@ -6,7 +6,7 @@ import 'src/audio/sound_fx.dart';
 import 'src/audio/sound_mute_store.dart';
 import 'src/platform/game_platform.dart';
 import 'src/storage.dart';
-import 'src/ui/board.dart';
+import 'src/art/paper_palette.dart';
 import 'src/ui/game_screen.dart';
 import 'src/ui/how_to_play.dart';
 
@@ -45,10 +45,10 @@ class NonoGridApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: NonoColors.accent,
-          brightness: Brightness.dark,
+          seedColor: PaperPalette.notebook.accent,
         ),
-        scaffoldBackgroundColor: NonoColors.background,
+        scaffoldBackgroundColor: PaperPalette.notebook.deskBottom,
+        fontFamily: 'Roboto',
       ),
       home: GameScreen(
         storage: storage,

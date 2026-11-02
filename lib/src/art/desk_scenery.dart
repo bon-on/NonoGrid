@@ -52,8 +52,17 @@ class DeskSceneryPainter extends CustomPainter {
       -0.5,
     );
     _inkBottle(canvas, Offset(unit * 1.0, size.height - unit * 1.05), unit);
-    _crane(canvas, Offset(size.width - unit * 1.2, unit * 1.0), unit * 0.9);
-    _scrap(canvas, Offset(unit * 0.9, unit * 0.9), unit * 0.9, 0.25);
+    if (size.width > size.height) {
+      // Landscape: the side panels cover the corners, so the crane sits in
+      // the open strip under the board.
+      _crane(
+        canvas,
+        Offset(size.width * 0.5 - unit * 3.2, size.height - unit * 0.55),
+        unit * 0.7,
+      );
+      _scrap(canvas, Offset(unit * 0.9, unit * 0.9), unit * 0.9, 0.25);
+    }
+    // Portrait keeps the header corners clear for the title and buttons.
     _scrap(
       canvas,
       Offset(size.width * 0.5 + unit * 4, size.height - unit * 0.35),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../art/paper_palette.dart';
+import 'paper_ui.dart';
+
 /// Remembers whether the first-run tutorial has been seen.
 abstract class TutorialStore {
   Future<bool> isSeen();
@@ -51,11 +54,12 @@ const nonoGridSteps = [
   ),
   HowToPlayStep(
     Icons.keyboard_outlined,
-    'Keys: arrows, Space fill, X mark, U undo, R restart. Check flags mistakes.',
+    'Keys: arrows, Space fill, X mark, U undo, R restart. Check flags '
+    'mistakes (finding one costs a star). Beat the par time for 3 stars.',
   ),
 ];
 
-/// Scrim + card. Stateless: the owner keeps [step] and handles keys.
+/// Scrim + paper card. Stateless: the owner keeps [step] and handles keys.
 class HowToPlayOverlay extends StatelessWidget {
   const HowToPlayOverlay({
     super.key,
@@ -63,15 +67,18 @@ class HowToPlayOverlay extends StatelessWidget {
     required this.step,
     required this.onNext,
     required this.onSkip,
+    this.palette = PaperPalette.notebook,
   });
 
   final List<HowToPlayStep> steps;
   final int step;
   final VoidCallback onNext;
   final VoidCallback onSkip;
+  final PaperPalette palette;
 
   @override
   Widget build(BuildContext context) {
+    final p = palette;
     final last = step == steps.length - 1;
     final s = steps[step];
     return Stack(
@@ -81,7 +88,7 @@ class HowToPlayOverlay extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {},
-            child: const ColoredBox(color: Color(0xB3000000)),
+            child: const ColoredBox(color: Color(0x99000000)),
           ),
         ),
         Center(
@@ -89,66 +96,88 @@ class HowToPlayOverlay extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 360),
-              child: Card(
+              child: PaperPanel(
                 key: const Key('how-to-play'),
-                elevation: 8,
-                color: const Color(0xFF1E293B),
+                palette: p,
+                tape: true,
+                padding: EdgeInsets.zero,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
+                      Text(
                         'How to play',
                         style: TextStyle(
+                          color: p.panelText,
                           fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Icon(
-                        s.icon,
-                        size: 44,
-                        color: Theme.of(context).colorScheme.primary,
+                      const SizedBox(height: 14),
+                      Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          color: p.accent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: p.panelBorder, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: p.panelBorder,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Icon(s.icon, size: 36, color: p.accentInk),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Text(
                         s.text,
                         key: const Key('how-to-play-text'),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16, height: 1.35),
+                        style: TextStyle(
+                          color: p.panelText,
+                          fontSize: 16,
+                          height: 1.35,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           for (var i = 0; i < steps.length; i++)
-                            Container(
-                              width: 8,
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: i == step ? 20 : 8,
                               height: 8,
                               margin: const EdgeInsets.symmetric(horizontal: 3),
                               decoration: BoxDecoration(
-                                shape: BoxShape.circle,
+                                borderRadius: BorderRadius.circular(4),
                                 color: i == step
-                                    ? Colors.white
-                                    : Colors.white24,
+                                    ? p.accent
+                                    : p.panelBorder.withValues(alpha: 0.25),
                               ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          TextButton(
+                          PaperButton(
                             key: const Key('how-to-play-skip'),
+                            palette: p,
+                            label: 'Skip',
+                            compact: true,
                             onPressed: onSkip,
-                            child: const Text('Skip'),
                           ),
-                          FilledButton(
+                          PaperButton(
                             key: const Key('how-to-play-next'),
+                            palette: p,
+                            label: last ? 'Play' : 'Next',
+                            primary: true,
                             onPressed: onNext,
-                            child: Text(last ? 'Play' : 'Next'),
                           ),
                         ],
                       ),

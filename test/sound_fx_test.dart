@@ -188,7 +188,7 @@ void main() {
     expect(played, [Sfx.fill]);
   });
 
-  testWidgets('a drag stroke plays one sound at its end', (t) async {
+  testWidgets('a drag stroke plays one fill sound at its end', (t) async {
     final played = await _launch(t);
     final paint = find.descendant(
       of: find.byType(NonoBoard),
@@ -203,7 +203,10 @@ void main() {
     expect(played, isEmpty);
     await g.up();
     await t.pump();
-    expect(played, [Sfx.fill]);
+    // Row 5 of the Heart has clue 1, so a three-cell stroke overfills it and
+    // adds the mistake cue after the one fill sound.
+    expect(played, [Sfx.fill, Sfx.mistake]);
+    await t.pump(const Duration(seconds: 1));
   });
 
   testWidgets('undo pressed during the winning stroke plays level_clear once', (

@@ -24,8 +24,10 @@ class PictureThumb extends StatelessWidget {
   final bool hidden;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    painter: PictureThumbPainter(cachedPuzzle(level), hidden: hidden),
+  Widget build(BuildContext context) => SizedBox.expand(
+    child: CustomPaint(
+      painter: PictureThumbPainter(cachedPuzzle(level), hidden: hidden),
+    ),
   );
 }
 
