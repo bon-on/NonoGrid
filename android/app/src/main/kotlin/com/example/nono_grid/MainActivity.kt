@@ -9,6 +9,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val players = mutableSetOf<MediaPlayer>()
+    private var musicPlayer: MediaPlayer? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -26,6 +27,18 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(null)
                 }
+                "startLoop" -> {
+                    val asset = call.argument<String>("asset")
+                    val volume = call.argument<Double>("volume")?.toFloat() ?: 0.4f
+                    if (asset != null) {
+                        startLoop(asset, volume)
+                    }
+                    result.success(null)
+                }
+                "stopLoop" -> {
+                    stopLoop()
+                    result.success(null)
+                }
                 "disposeAudio" -> {
                     disposeAudio()
                     result.success(null)
@@ -40,30 +53,53 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 
-    private fun playSound(asset: String, volume: Float) {
-        runCatching {
-            val key = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(asset)
-            val descriptor = assets.openFd(key)
-            val player = MediaPlayer()
-            try {
-                player.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_GAME)
-                        .build(),
-                )
+    // Releases the player and closes the descriptor if any step fails, so a
+    // broken asset never leaks a MediaPlayer or a file handle.
+    private fun openPlayer(asset: String, contentType: Int): MediaPlayer {
+        val key = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(asset)
+        val player = MediaPlayer()
+        try {
+            player.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(contentType)
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .build(),
+            )
+            assets.openFd(key).use { descriptor ->
                 player.setDataSource(
                     descriptor.fileDescriptor,
                     descriptor.startOffset,
                     descriptor.length,
                 )
-                player.prepare()
-            } catch (error: Exception) {
-                player.release()
-                throw error
-            } finally {
-                descriptor.close()
             }
+            player.prepare()
+            return player
+        } catch (error: Exception) {
+            player.release()
+            throw error
+        }
+    }
+
+    private fun startLoop(asset: String, volume: Float) {
+        stopLoop()
+        runCatching {
+            val player = openPlayer(asset, AudioAttributes.CONTENT_TYPE_MUSIC)
+            player.isLooping = true
+            player.setVolume(volume, volume)
+            player.start()
+            musicPlayer = player
+        }
+    }
+
+    private fun stopLoop() {
+        runCatching { musicPlayer?.stop() }
+        musicPlayer?.release()
+        musicPlayer = null
+    }
+
+    private fun playSound(asset: String, volume: Float) {
+        runCatching {
+            val player = openPlayer(asset, AudioAttributes.CONTENT_TYPE_SONIFICATION)
             player.setVolume(volume, volume)
             player.setOnCompletionListener {
                 players.remove(it)
@@ -75,6 +111,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun disposeAudio() {
+        stopLoop()
         players.forEach { it.release() }
         players.clear()
     }

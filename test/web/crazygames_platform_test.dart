@@ -62,11 +62,20 @@ void main() {
       final platform = CrazyGamesPlatform();
       await platform.initialize();
       expect(platform.isAudioMuted, isTrue);
+      var changes = 0;
+      platform.setAudioMuteListener(() => changes++);
       sdk.listener!.callAsFunction(
         null,
         JSObject()..setProperty('muteAudio'.toJS, false.toJS),
       );
       expect(platform.isAudioMuted, isFalse);
+      expect(changes, 1, reason: 'music hears the portal mute change');
+      sdk.listener!.callAsFunction(
+        null,
+        JSObject()..setProperty('muteAudio'.toJS, false.toJS),
+      );
+      expect(changes, 1, reason: 'unchanged settings do not notify');
+      platform.setAudioMuteListener(null);
     },
   );
 

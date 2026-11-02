@@ -22,6 +22,10 @@ abstract class GamePlatform {
   /// `settings.muteAudio`). Combined with the player's own mute toggle.
   bool get isAudioMuted => false;
 
+  /// Registers a callback for [isAudioMuted] changes (null clears it), so
+  /// music can stop or resume as soon as the portal setting flips.
+  void setAudioMuteListener(void Function()? listener) {}
+
   /// Prepares the portal SDK. Never throws; failures downgrade to no-op.
   Future<void> initialize();
 
