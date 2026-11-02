@@ -382,8 +382,8 @@ class _GameScreenState extends State<GameScreen>
       _clock.stop();
       final seconds = _elapsed;
       unawaited(_storage.clearProgress());
-      _storage.recordClear(_level, seconds).then((best) {
-        if (mounted) setState(() => _newBest = best);
+      _storage.recordClear(_level, seconds).then((result) {
+        if (mounted) setState(() => _newBest = result.newBest);
       });
       _reveal.forward(from: 0);
     } else {
