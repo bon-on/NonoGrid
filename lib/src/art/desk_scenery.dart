@@ -9,23 +9,29 @@ import 'paper_palette.dart';
 ///
 /// Static: it only repaints when the palette or size changes.
 class DeskScenery extends StatelessWidget {
-  const DeskScenery({super.key, required this.palette});
+  const DeskScenery({super.key, required this.palette, this.showProps = true});
 
   final PaperPalette palette;
+
+  /// Draws the pencil, ink bottle, crane and scraps. Stacked (narrow)
+  /// layouts turn them off: there the board and controls span the whole
+  /// width, so any prop would sit under a button.
+  final bool showProps;
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
     child: CustomPaint(
-      painter: DeskSceneryPainter(palette),
+      painter: DeskSceneryPainter(palette, showProps: showProps),
       child: const SizedBox.expand(),
     ),
   );
 }
 
 class DeskSceneryPainter extends CustomPainter {
-  DeskSceneryPainter(this.p);
+  DeskSceneryPainter(this.p, {this.showProps = true});
 
   final PaperPalette p;
+  final bool showProps;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -42,6 +48,22 @@ class DeskSceneryPainter extends CustomPainter {
     _grain(canvas, size);
     _specks(canvas, size);
     if (p.night) _night(canvas, size);
+    if (showProps) _props(canvas, size);
+    // Soft vignette pulls the eye to the centre.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = RadialGradient(
+          radius: 0.85,
+          colors: [const Color(0x00000000), const Color(0x33000000)],
+          stops: const [0.6, 1],
+        ).createShader(rect),
+    );
+  }
+
+  /// Props for the side-panel layout: the corners sit behind the panels and
+  /// the crane and scrap fill the open strip under the board.
+  void _props(Canvas canvas, Size size) {
     final s = math.min(size.width, size.height);
     final unit = (s / 9).clamp(28.0, 90.0);
     _pencil(
@@ -52,32 +74,17 @@ class DeskSceneryPainter extends CustomPainter {
       -0.5,
     );
     _inkBottle(canvas, Offset(unit * 1.0, size.height - unit * 1.05), unit);
-    if (size.width > size.height) {
-      // Landscape: the side panels cover the corners, so the crane sits in
-      // the open strip under the board.
-      _crane(
-        canvas,
-        Offset(size.width * 0.5 - unit * 3.2, size.height - unit * 0.55),
-        unit * 0.7,
-      );
-      _scrap(canvas, Offset(unit * 0.9, unit * 0.9), unit * 0.9, 0.25);
-    }
-    // Portrait keeps the header corners clear for the title and buttons.
+    _crane(
+      canvas,
+      Offset(size.width * 0.5 - unit * 3.2, size.height - unit * 0.55),
+      unit * 0.7,
+    );
+    _scrap(canvas, Offset(unit * 0.9, unit * 0.9), unit * 0.9, 0.25);
     _scrap(
       canvas,
       Offset(size.width * 0.5 + unit * 4, size.height - unit * 0.35),
       unit * 0.6,
       -0.4,
-    );
-    // Soft vignette pulls the eye to the centre.
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = RadialGradient(
-          radius: 0.85,
-          colors: [const Color(0x00000000), const Color(0x33000000)],
-          stops: const [0.6, 1],
-        ).createShader(rect),
     );
   }
 
@@ -360,5 +367,6 @@ class DeskSceneryPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(DeskSceneryPainter old) => old.p != p;
+  bool shouldRepaint(DeskSceneryPainter old) =>
+      old.p != p || old.showProps != showProps;
 }

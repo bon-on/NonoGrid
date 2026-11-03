@@ -792,7 +792,9 @@ class _GameScreenState extends State<GameScreen>
             onPointerDown: (_) => _onAnyInput(),
             child: Stack(
               children: [
-                Positioned.fill(child: DeskScenery(palette: p)),
+                Positioned.fill(
+                  child: DeskScenery(palette: p, showProps: wide),
+                ),
                 SafeArea(child: wide ? _wideLayout(p, size) : _narrowLayout(p)),
                 ..._overlays(p),
               ],

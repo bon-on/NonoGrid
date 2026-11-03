@@ -115,6 +115,25 @@ void main() {
     });
   }
 
+  for (final (size, wide) in const [
+    (Size(390, 844), false),
+    (Size(360, 640), false),
+    (Size(320, 640), false),
+    (Size(800, 700), false),
+    (Size(844, 390), true),
+    (Size(1280, 720), true),
+  ]) {
+    testWidgets('desk props only beside side panels at $size', (t) async {
+      await _launch(t, size: size);
+      final desk = t.widget<DeskScenery>(find.byType(DeskScenery));
+      expect(
+        desk.showProps,
+        wide,
+        reason: 'stacked layouts keep props out from under the controls',
+      );
+    });
+  }
+
   testWidgets('win shows summary with stars, XP and Enter goes next', (
     t,
   ) async {
