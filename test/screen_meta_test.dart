@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nono_grid/main.dart';
@@ -90,6 +91,7 @@ void main() {
     Size(1366, 768),
     Size(390, 844),
     Size(844, 390),
+    Size(667, 375),
     Size(320, 640),
   ]) {
     testWidgets('main screen and summary fit $size', (t) async {
@@ -131,6 +133,33 @@ void main() {
         wide,
         reason: 'stacked layouts keep props out from under the controls',
       );
+    });
+  }
+
+  for (final size in const [Size(844, 390), Size(1280, 720), Size(1366, 768)]) {
+    testWidgets('tool panel hint is never clipped at $size', (t) async {
+      await _launch(t, size: size);
+      final hint = find.byKey(const Key('panel-hint'));
+      if (size.height < 500) {
+        expect(hint, findsNothing, reason: 'short panels drop the hint');
+      } else {
+        expect(hint, findsOneWidget);
+        final text = t.renderObject<RenderParagraph>(
+          find.descendant(of: hint, matching: find.byType(RichText)),
+        );
+        expect(text.didExceedMaxLines, isFalse);
+      }
+      // Every tool-panel control stays inside the screen.
+      for (final f in [
+        find.text('Restart'),
+        find.byKey(const Key('sound-toggle')),
+      ]) {
+        expect(
+          t.getRect(f).bottom,
+          lessThanOrEqualTo(size.height),
+          reason: '$f',
+        );
+      }
     });
   }
 

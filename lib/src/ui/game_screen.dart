@@ -34,6 +34,9 @@ bool _isBrowserShortcut(KeyEvent e) {
   return kb.isControlPressed || kb.isMetaPressed || kb.isAltPressed;
 }
 
+/// Tool panel height below which the key hint is left out.
+const double _kHintMinPanelHeight = 440;
+
 /// Overlays other than the tutorial.
 enum _Panel { none, summary, album, levels, themes }
 
@@ -1341,21 +1344,26 @@ class _GameScreenState extends State<GameScreen>
                     : _toolButtons(p, vertical: true),
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                height: 40,
-                child: Text(
+              // Short panels (landscape phones) drop the key hint, which the
+              // tutorial also covers, so nothing is clipped; messages keep a
+              // single line there.
+              if (_message != null || c.maxHeight >= _kHintMinPanelHeight)
+                Text(
                   _message ?? _hint(true),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  key: const Key('panel-hint'),
+                  maxLines: c.maxHeight >= _kHintMinPanelHeight ? null : 1,
+                  overflow: c.maxHeight >= _kHintMinPanelHeight
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
                   style: TextStyle(
                     color: _message != null ? p.accent : p.panelSubtle,
                     fontSize: _message != null ? 14 : 11,
+                    height: 1.3,
                     fontWeight: _message != null
                         ? FontWeight.w800
                         : FontWeight.w400,
                   ),
                 ),
-              ),
               const SizedBox(height: 4),
               Center(child: _soundHelp(p)),
             ],
