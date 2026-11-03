@@ -61,7 +61,8 @@ stays in browser localStorage only.
 - At startup the local mirror wins when it belongs to the same player and its revision is not older than the account copy;
   otherwise the account copy wins. Another player's mirror is never used. Progress from before this feature is adopted only
   when no account copy exists.
-- A login or logout (`user.addAuthListener`) reloads the page. If the initial user cannot be read, cloud save stays off.
+- While cloud save is active, the page reloads (`user.addAuthListener`) only when the player changes
+  to a different player or logs out. If the initial user cannot be read, cloud save stays off.
 
 ## Disabled in the CrazyGames build
 
@@ -75,3 +76,4 @@ hub navigation bar, and `index.html` contains no outbound links.
 - [ ] Input: mouse/touch and keyboard (see README).
 - [ ] Covers (not created yet): 1920x1080, 800x1200, 800x800.
 - [ ] Check loading and gameplay events in the portal QA tool.
+- [ ] Progress Save: set to "Yes, using the Data Module from the CrazyGames SDK".

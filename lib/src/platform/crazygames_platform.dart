@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
@@ -27,12 +26,14 @@ class CrazyGamesPlatform extends GamePlatform {
 
   @override
   Future<void> initialize() async {
+    late final _Sdk sdk;
     try {
-      final sdk = _findSdk();
-      if (sdk == null) {
+      final found = _findSdk();
+      if (found == null) {
         debugPrint('CrazyGames SDK not found; running without it.');
         return;
       }
+      sdk = found;
       // A hung init (blocked SDK requests) must not keep the game from starting.
       await sdk.init().toDart.timeout(_initTimeout);
       final environment = sdk.environment;
@@ -42,11 +43,13 @@ class CrazyGamesPlatform extends GamePlatform {
       }
       _sdk = sdk;
       _watchSettings(sdk);
-      await _useCloudSave(sdk);
     } catch (error) {
       debugPrint('CrazyGames SDK init failed: $error');
       _sdk = null;
+      return;
     }
+    // Cloud storage is optional; its failure must not disable gameplay events.
+    await _useCloudSave(sdk);
   }
 
   /// Routes shared_preferences through the SDK Data module so logged-in

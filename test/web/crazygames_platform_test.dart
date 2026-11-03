@@ -97,6 +97,53 @@ void main() {
     platform.gameplayStop();
   });
 
+  test('throwing SDK lookup falls back to no-op', () async {
+    final host = JSObject();
+    final descriptor = JSObject()
+      ..setProperty(
+        'get'.toJS,
+        ((() => throw 'blocked SDK'.toJS) as JSAny? Function()).toJS,
+      );
+    globalContext
+        .getProperty<JSObject>('Object'.toJS)
+        .callMethod<JSAny?>(
+          'defineProperty'.toJS,
+          host,
+          'SDK'.toJS,
+          descriptor,
+        );
+    globalContext.setProperty('CrazyGames'.toJS, host);
+    final platform = CrazyGamesPlatform();
+    await platform.initialize();
+    platform.gameplayStart();
+    platform.gameplayStop();
+  });
+
+  test('unavailable cloud module preserves gameplay events', () async {
+    final fake = _FakeSdk();
+    final sdk = globalContext
+        .getProperty<JSObject>('CrazyGames'.toJS)
+        .getProperty<JSObject>('SDK'.toJS);
+    final descriptor = JSObject()
+      ..setProperty(
+        'get'.toJS,
+        ((() => throw 'blocked data'.toJS) as JSAny? Function()).toJS,
+      );
+    globalContext
+        .getProperty<JSObject>('Object'.toJS)
+        .callMethod<JSAny?>(
+          'defineProperty'.toJS,
+          sdk,
+          'data'.toJS,
+          descriptor,
+        );
+    final platform = CrazyGamesPlatform();
+    await platform.initialize();
+    platform.gameplayStart();
+    platform.gameplayStop();
+    expect(fake.calls, ['gameplayStart', 'gameplayStop']);
+  });
+
   test('disabled environment never calls the SDK', () async {
     final sdk = _FakeSdk(environment: 'disabled');
     final platform = CrazyGamesPlatform();
