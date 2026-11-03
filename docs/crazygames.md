@@ -50,6 +50,19 @@ On `localhost` the SDK environment is `local`; the console logs
 Only transitions are reported. On first launch the first start comes after the tutorial
 closes.
 
+## Progress Save
+
+Progress is saved through the SDK Data module (`feature-crazygames-cloud-save`). On the submission screen, **Progress Save**
+must be set to "Yes, using the Data Module from the CrazyGames SDK"; otherwise the Data module is disabled and progress
+stays in browser localStorage only.
+
+- All preferences are stored in one Data module key, `prefs_v1`, as `{rev, owner, values}`, and mirrored to localStorage.
+  localStorage `cg_prefs_stamp_v1` records the mirror's owner (username, null for guests) and revision.
+- At startup the local mirror wins when it belongs to the same player and its revision is not older than the account copy;
+  otherwise the account copy wins. Another player's mirror is never used. Progress from before this feature is adopted only
+  when no account copy exists.
+- A login or logout (`user.addAuthListener`) reloads the page. If the initial user cannot be read, cloud save stays off.
+
 ## Disabled in the CrazyGames build
 
 Nothing needs disabling: the game has no ads, no leaderboard or result upload and no

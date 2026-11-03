@@ -6,6 +6,7 @@ related_specs:
   - feature-nono-grid-crazygames
   - feature-sound-effects
   - feature-retention-polish
+  - feature-crazygames-cloud-save
 evidence_files:
   - docs/crazygames.md
   - reports/nono-grid-crazygames-verification.md

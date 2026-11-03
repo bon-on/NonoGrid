@@ -6,6 +6,7 @@ related_specs:
   - feature-nono-grid-crazygames
   - feature-sound-effects
   - feature-retention-polish
+  - feature-crazygames-cloud-save
 ---
 
 # ADR: Use a build flag and a platform adapter for the CrazyGames build
