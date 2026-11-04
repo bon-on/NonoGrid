@@ -98,3 +98,7 @@ ambiguous (more than one picture fits the clues).
 
 ## Amendment: key auto-repeat
 Key auto-repeat only moves the cursor with the arrow keys; Space, X, U, R and Enter act once per key press.
+
+## Random assignment extension
+
+`feature-random-practice` supersedes the seed=level/new-install curated-content policy for new puzzle assignments. Historical generator calls and exposed puzzles in old saves remain unchanged. There is no separate practice mode.

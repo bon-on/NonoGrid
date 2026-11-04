@@ -45,7 +45,8 @@ Future<(GameStorage, _FakePlatform, List<Sfx>)> _launch(
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
-  SharedPreferences.setMockInitialValues(prefs);
+  // These tests exercise the historical Heart/Arrow fixtures.
+  SharedPreferences.setMockInitialValues({'level': 1, ...prefs});
   final storage = await GameStorage.open();
   final platform = _FakePlatform();
   final played = <Sfx>[];

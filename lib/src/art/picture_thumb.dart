@@ -16,9 +16,17 @@ Puzzle cachedPuzzle(int level) {
 
 /// A solved puzzle drawn as its coloured picture.
 class PictureThumb extends StatelessWidget {
-  const PictureThumb({super.key, required this.level, this.hidden = false});
+  const PictureThumb({
+    super.key,
+    required this.level,
+    this.hidden = false,
+    this.puzzle,
+  });
 
   final int level;
+
+  /// Assigned puzzle supplied by storage; legacy fallback for standalone previews.
+  final Puzzle? puzzle;
 
   /// Draws a question-mark silhouette instead of the picture.
   final bool hidden;
@@ -26,7 +34,10 @@ class PictureThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox.expand(
     child: CustomPaint(
-      painter: PictureThumbPainter(cachedPuzzle(level), hidden: hidden),
+      painter: PictureThumbPainter(
+        puzzle ?? cachedPuzzle(level),
+        hidden: hidden,
+      ),
     ),
   );
 }
@@ -74,5 +85,5 @@ class PictureThumbPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(PictureThumbPainter old) =>
-      old.puzzle.level != puzzle.level || old.hidden != hidden;
+      !identical(old.puzzle, puzzle) || old.hidden != hidden;
 }

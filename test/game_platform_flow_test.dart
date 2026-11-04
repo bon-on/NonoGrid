@@ -28,7 +28,7 @@ Future<_FakePlatform> _launch(
   t.view.physicalSize = const Size(1280, 720);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues({'level': 1});
   final storage = await GameStorage.open();
   final platform = _FakePlatform();
   await t.pumpWidget(

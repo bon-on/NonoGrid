@@ -99,7 +99,7 @@ void main() {
     tester.view.physicalSize = const Size(1280, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final s = await storage();
+    final s = await storage({'level': 1});
     await tester.pumpWidget(NonoGridApp(storage: s, tutorialStore: seen()));
     await tester.pump();
     final p = puzzleForLevel(1);

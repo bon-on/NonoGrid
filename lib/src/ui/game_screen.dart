@@ -182,7 +182,7 @@ class _GameScreenState extends State<GameScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final level = _storage.level.clamp(1, _storage.unlocked);
+    final level = _storage.startupLevel;
     _load(level);
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (_clock.isRunning && mounted) setState(() {});
@@ -482,7 +482,7 @@ class _GameScreenState extends State<GameScreen>
 
   void _load(int level) {
     _level = level;
-    _game = NonoGame(puzzleForLevel(level));
+    _game = NonoGame(_storage.puzzleFor(level));
     _clock
       ..stop()
       ..reset();
@@ -817,6 +817,7 @@ class _GameScreenState extends State<GameScreen>
             key: ValueKey('summary-$_level'),
             palette: p,
             result: result,
+            puzzle: _game.puzzle,
             title: _levelTitle,
             onNext: () => _goTo(_level + 1),
             onReplay: () {
@@ -837,6 +838,7 @@ class _GameScreenState extends State<GameScreen>
             palette: p,
             solved: _storage.solvedLevels,
             starsOf: _storage.stars,
+            puzzleOf: _storage.previewPuzzle,
             onOpen: _openLevelFromOverlay,
             onClose: _closePanel,
           ),
@@ -850,6 +852,7 @@ class _GameScreenState extends State<GameScreen>
             current: _level,
             unlocked: _storage.unlocked,
             starsOf: _storage.stars,
+            puzzleOf: _storage.previewPuzzle,
             onSelect: _openLevelFromOverlay,
             onPage: (page) => setState(() {
               _mapPage = math.max(0, page);

@@ -8,6 +8,7 @@ related_specs:
   - feature-game-hub-navigation
   - feature-sound-effects
   - feature-retention-polish
+  - feature-random-practice
 evidence_files:
   - reports/nono-grid-mvp-verification.md
 ---

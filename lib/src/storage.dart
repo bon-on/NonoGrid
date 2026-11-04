@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'logic/game.dart';
 import 'logic/puzzle.dart';
+import 'logic/rng.dart';
 import 'meta/progress_rules.dart';
 
 /// Saved in-progress board for one level.
@@ -59,7 +62,10 @@ class NonoProgressData {
     this.xp = 0,
     this.theme = NonoTheme.notebook,
     this.progress,
-  }) : records = records ?? <int, LevelRecord>{};
+    Map<int, int>? puzzleSeeds,
+    this.legacyThrough = 0,
+  }) : records = records ?? <int, LevelRecord>{},
+       puzzleSeeds = puzzleSeeds ?? <int, int>{};
 
   int level;
   int maxCleared;
@@ -67,6 +73,8 @@ class NonoProgressData {
   int xp;
   NonoTheme theme;
   SavedProgress? progress;
+  final Map<int, int> puzzleSeeds;
+  final int legacyThrough;
 
   Map<String, Object?> toJson() => {
     'version': 2,
@@ -74,6 +82,8 @@ class NonoProgressData {
     'maxCleared': maxCleared,
     'xp': xp,
     'theme': theme.id,
+    'legacyThrough': legacyThrough,
+    'puzzleSeeds': {for (final e in puzzleSeeds.entries) '${e.key}': e.value},
     'records': {
       for (final e in records.entries)
         '${e.key}': {
@@ -107,19 +117,68 @@ class NonoProgressData {
           );
         }
       }
+      final level = intOr(json['level'], 1, min: 1);
+      final maxCleared = intOr(json['maxCleared'], 0);
+      var progress = SavedProgress.fromJson(json['progress']);
+      final hasAssignments =
+          json.containsKey('legacyThrough') || json.containsKey('puzzleSeeds');
+      final legacyThrough = hasAssignments
+          ? intOr(json['legacyThrough'], 0)
+          : _exposedThrough(level, maxCleared, progress, records);
+      final seeds = <int, int>{};
+      final rawSeeds = json['puzzleSeeds'];
+      if (rawSeeds is Map) {
+        for (final e in rawSeeds.entries) {
+          final l = int.tryParse('${e.key}');
+          final seed = e.value;
+          if (l != null &&
+              l > legacyThrough &&
+              l <= 1 << 30 &&
+              seed is int &&
+              seed > 0 &&
+              seed <= 0xFFFFFFFF) {
+            seeds[l] = seed;
+          }
+        }
+      }
+      // A missing/corrupt seed cannot safely identify the board these marks
+      // belong to. Keep earned meta progress, but never apply those marks to
+      // a newly generated puzzle.
+      if (progress != null &&
+          progress.level > legacyThrough &&
+          !seeds.containsKey(progress.level)) {
+        progress = null;
+      }
       return NonoProgressData(
-        level: intOr(json['level'], 1, min: 1),
-        maxCleared: intOr(json['maxCleared'], 0),
+        level: level,
+        maxCleared: maxCleared,
         records: records,
         xp: intOr(json['xp'], 0),
         theme: NonoTheme.fromId(
           json['theme'] is String ? json['theme'] as String : null,
         ),
-        progress: SavedProgress.fromJson(json['progress']),
+        progress: progress,
+        puzzleSeeds: seeds,
+        legacyThrough: legacyThrough,
       );
     } catch (_) {
       return null;
     }
+  }
+
+  static int _exposedThrough(
+    int level,
+    int maxCleared,
+    SavedProgress? progress,
+    Map<int, LevelRecord> records,
+  ) {
+    var highest = maxCleared + 1;
+    if (level > highest) highest = level;
+    if (progress != null && progress.level > highest) highest = progress.level;
+    for (final recorded in records.keys) {
+      if (recorded > highest) highest = recorded;
+    }
+    return highest;
   }
 
   /// Builds v2 data from the v1 keys (`level`, `maxCleared`, `best_<n>`,
@@ -166,12 +225,23 @@ class NonoProgressData {
         (readInt('progressElapsed') ?? 0).clamp(0, 1 << 30),
       );
     }
+    final level = (readInt('level') ?? 1).clamp(1, 1 << 30);
+    final legacyKeys = prefs.getKeys().any(
+      (key) =>
+          key == 'level' ||
+          key == 'maxCleared' ||
+          key.startsWith('progress') ||
+          RegExp(r'^best_\d+$').hasMatch(key),
+    );
     return NonoProgressData(
-      level: (readInt('level') ?? 1).clamp(1, 1 << 30),
+      level: level,
       maxCleared: maxCleared,
       records: records,
       xp: xp,
       progress: progress,
+      legacyThrough: legacyKeys
+          ? _exposedThrough(level, maxCleared, progress, records)
+          : 0,
     );
   }
 }
@@ -182,36 +252,97 @@ class NonoProgressData {
 /// Everything is read once in [open] (before the app starts), so nothing is
 /// ever saved before the stored value has loaded. Write failures are ignored.
 class GameStorage {
-  GameStorage._(this._prefs, this._data);
+  GameStorage._(this._prefs, this._data, this._seedSource);
 
   static const progressKey = 'nonogrid_progress_v2';
 
-  static Future<GameStorage> open() async {
+  static Future<GameStorage> open({int Function()? seedSource}) async {
     final prefs = await SharedPreferences.getInstance();
-    return GameStorage.fromPrefs(prefs);
+    return GameStorage.fromPrefs(prefs, seedSource: seedSource);
   }
 
-  factory GameStorage.fromPrefs(SharedPreferences prefs) {
+  factory GameStorage.fromPrefs(
+    SharedPreferences prefs, {
+    int Function()? seedSource,
+  }) {
     String? raw;
     try {
       raw = prefs.getString(progressKey);
     } catch (_) {}
     final data =
         NonoProgressData.tryParse(raw) ?? NonoProgressData.fromLegacy(prefs);
-    return GameStorage._(prefs, data);
+    final rng = SeededRng(DateTime.now().microsecondsSinceEpoch);
+    return GameStorage._(prefs, data, seedSource ?? rng.nextUint32);
   }
 
   final SharedPreferences _prefs;
   final NonoProgressData _data;
+  final int Function() _seedSource;
+  final Map<int, Puzzle> _puzzles = {};
+  Future<void> _pendingWrite = Future.value();
 
-  Future<void> _save() async {
-    try {
-      await _prefs.setString(progressKey, jsonEncode(_data.toJson()));
-    } catch (_) {}
+  Future<void> _save() {
+    final snapshot = jsonEncode(_data.toJson());
+    _pendingWrite = _pendingWrite.then((_) async {
+      try {
+        await _prefs.setString(progressKey, snapshot);
+      } catch (_) {}
+    });
+    return _pendingWrite;
+  }
+
+  /// Allocates one permanent puzzle on its first actual visit. Thumbnail
+  /// rendering must use [previewPuzzle] instead.
+  Puzzle puzzleFor(int level) {
+    if (level < 1) throw ArgumentError.value(level, 'level');
+    if (level > _data.legacyThrough && !_data.puzzleSeeds.containsKey(level)) {
+      final seed = _seedSource() & 0xFFFFFFFF;
+      _data.puzzleSeeds[level] = seed == 0 ? 1 : seed;
+      _puzzles.remove(level);
+      unawaited(_save());
+    }
+    return previewPuzzle(level);
+  }
+
+  /// Returns an existing assignment or a legacy placeholder without saving
+  /// or consuming randomness for a locked/unopened level.
+  Puzzle previewPuzzle(int level) => _puzzles.putIfAbsent(level, () {
+    final seed = _data.puzzleSeeds[level];
+    // A record with a damaged assignment cannot be reconstructed. Show an
+    // empty placeholder instead of falsely presenting a legacy picture.
+    if (seed == null &&
+        level > _data.legacyThrough &&
+        (_data.records[level]?.stars ?? 0) > 0) {
+      final size = sizeForLevel(level);
+      return Puzzle(
+        level: level,
+        size: size,
+        solution: List<bool>.filled(size * size, false),
+      );
+    }
+    return seed == null
+        ? puzzleForLevel(level)
+        : generatePuzzle(level, seed: seed);
+  });
+
+  /// Resume any valid unfinished board before considering advancement.
+  int get startupLevel {
+    final selected = level.clamp(1, unlocked);
+    final saved = progress;
+    if (saved != null &&
+        saved.level >= 1 &&
+        saved.level <= unlocked &&
+        (saved.level <= _data.legacyThrough ||
+            _data.puzzleSeeds.containsKey(saved.level))) {
+      final game = NonoGame(previewPuzzle(saved.level));
+      if (game.restore(saved.cells) && !game.isWon) return saved.level;
+    }
+    return selected <= maxCleared ? unlocked : selected;
   }
 
   int get level => _data.level;
   Future<void> setLevel(int level) {
+    puzzleFor(level);
     _data.level = level;
     return _save();
   }
@@ -257,6 +388,7 @@ class GameStorage {
     int seconds, {
     bool mistakes = false,
   }) async {
+    puzzleFor(level);
     final size = sizeForLevel(level);
     final stars = starsFor(size: size, seconds: seconds, mistakes: mistakes);
     final old = _data.records[level];
@@ -299,6 +431,7 @@ class GameStorage {
   SavedProgress? get progress => _data.progress;
 
   Future<void> saveProgress(SavedProgress p) {
+    puzzleFor(p.level);
     _data.progress = p;
     return _save();
   }

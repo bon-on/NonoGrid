@@ -6,6 +6,7 @@ related_specs:
   - feature-nono-grid-mvp
   - feature-how-to-play-tutorial
   - feature-retention-polish
+  - feature-random-practice
 ---
 
 # ADR: Generate levels from seeded random grids accepted only when line logic solves them
@@ -55,3 +56,6 @@ and still allows puzzles that need deep trial and error.
   refer to different puzzles). Treat such changes as breaking and note them.
 - Generation takes about a millisecond per level, so it runs synchronously on
   level load.
+
+## Random default with persistent assignments
+New levels receive a persisted independent nonzero seed, generated at the existing sizeForLevel difficulty. Default generator calls still use seed=level for legacy compatibility. New assignments bypass curated pictures. Seeds live in the same local/cloud progress envelope as board marks and records. Existing v1/v2 saves retain deterministic content for exposed levels so old marks and album entries remain valid. Reopening an unfinished level preserves its seed; completing a level advances the next startup when no unfinished board needs resuming. There is no separate random mode.

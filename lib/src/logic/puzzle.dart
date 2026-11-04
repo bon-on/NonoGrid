@@ -97,9 +97,14 @@ const double kMaxDensity = 0.68;
 /// the picture (toward the target density) and retry. Restart from a fresh
 /// random grid after a bounded number of tweaks; after a bounded number of
 /// restarts fall back to a trivially solvable pattern.
-Puzzle generatePuzzle(int level, {GeneratorStats? stats, int? sizeOverride}) {
+Puzzle generatePuzzle(
+  int level, {
+  GeneratorStats? stats,
+  int? sizeOverride,
+  int? seed,
+}) {
   final size = sizeOverride ?? sizeForLevel(level);
-  final rng = SeededRng(level);
+  final rng = SeededRng(seed ?? level);
   final total = size * size;
   final target = 0.5 + rng.nextDouble() * 0.1;
   const maxAttempts = 40;

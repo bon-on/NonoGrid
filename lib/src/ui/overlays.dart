@@ -105,12 +105,14 @@ class SummaryOverlay extends StatefulWidget {
     required this.onReplay,
     required this.onAlbum,
     required this.onClose,
+    this.puzzle,
     this.onStar,
     this.onFinished,
   });
 
   final PaperPalette palette;
   final ClearResult result;
+  final Puzzle? puzzle;
   final String title;
   final VoidCallback onNext;
   final VoidCallback onReplay;
@@ -194,7 +196,10 @@ class _SummaryOverlayState extends State<SummaryOverlay>
                     SizedBox(
                       width: 84,
                       height: 84,
-                      child: PictureThumb(level: r.level),
+                      child: PictureThumb(
+                        level: r.level,
+                        puzzle: widget.puzzle,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -416,6 +421,7 @@ class AlbumOverlay extends StatelessWidget {
     required this.palette,
     required this.solved,
     required this.starsOf,
+    this.puzzleOf,
     required this.onOpen,
     required this.onClose,
   });
@@ -423,6 +429,7 @@ class AlbumOverlay extends StatelessWidget {
   final PaperPalette palette;
   final List<int> solved;
   final int Function(int level) starsOf;
+  final Puzzle Function(int level)? puzzleOf;
   final void Function(int level) onOpen;
   final VoidCallback onClose;
 
@@ -463,7 +470,8 @@ class AlbumOverlay extends StatelessWidget {
                   itemCount: solved.length,
                   itemBuilder: (context, i) {
                     final level = solved[i];
-                    final name = cachedPuzzle(level).name;
+                    final name =
+                        (puzzleOf?.call(level) ?? cachedPuzzle(level)).name;
                     return GestureDetector(
                       onTap: () => onOpen(level),
                       child: Column(
@@ -479,7 +487,10 @@ class AlbumOverlay extends StatelessWidget {
                                   color: p.panelBorder.withValues(alpha: 0.5),
                                 ),
                               ),
-                              child: PictureThumb(level: level),
+                              child: PictureThumb(
+                                level: level,
+                                puzzle: puzzleOf?.call(level),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -521,6 +532,7 @@ class LevelMapOverlay extends StatelessWidget {
     required this.current,
     required this.unlocked,
     required this.starsOf,
+    this.puzzleOf,
     required this.onSelect,
     required this.onPage,
     required this.onClose,
@@ -532,6 +544,7 @@ class LevelMapOverlay extends StatelessWidget {
   final int current;
   final int unlocked;
   final int Function(int level) starsOf;
+  final Puzzle Function(int level)? puzzleOf;
   final void Function(int level) onSelect;
   final void Function(int page) onPage;
   final VoidCallback onClose;
@@ -578,6 +591,9 @@ class LevelMapOverlay extends StatelessWidget {
                           height: node + 14,
                           child: _MapNode(
                             level: first + i,
+                            puzzle: starsOf(first + i) > 0
+                                ? puzzleOf?.call(first + i)
+                                : null,
                             size: node,
                             palette: p,
                             stars: starsOf(first + i),
@@ -684,6 +700,7 @@ class _PathPainter extends CustomPainter {
 class _MapNode extends StatelessWidget {
   const _MapNode({
     required this.level,
+    this.puzzle,
     required this.size,
     required this.palette,
     required this.stars,
@@ -694,6 +711,7 @@ class _MapNode extends StatelessWidget {
   });
 
   final int level;
+  final Puzzle? puzzle;
   final double size;
   final PaperPalette palette;
   final int stars;
@@ -715,7 +733,7 @@ class _MapNode extends StatelessWidget {
     } else if (solved) {
       face = Padding(
         padding: EdgeInsets.all(size * 0.17),
-        child: PictureThumb(level: level),
+        child: PictureThumb(level: level, puzzle: puzzle),
       );
     } else {
       face = Text(

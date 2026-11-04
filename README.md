@@ -1,8 +1,8 @@
 # NonoGrid
 
-A small nonogram (paint-by-numbers) logic puzzle built with Flutter. Every
-level is generated from its level number and is guaranteed to be uniquely
-solvable by line logic alone, so you never have to guess.
+A small nonogram (paint-by-numbers) logic puzzle built with Flutter. New levels receive a random seed matched to their grid-size difficulty.
+The seed is saved, so reopening, restarting or replaying keeps the same puzzle.
+Every puzzle is uniquely solvable by line logic alone, so you never have to guess.
 
 Runs in the browser (GitHub Pages) and on iOS/Android. No ads, no network,
 no accounts; progress is stored locally on the device.
@@ -31,6 +31,12 @@ no accounts; progress is stored locally on the device.
   paper. Esc closes any of them.
 - After a win a summary shows time, best, stars, XP and new unlocks
   (Enter: next puzzle, Esc: look at the picture).
+
+
+On reopening, a valid unfinished board resumes with the same puzzle, marks,
+elapsed time and mistake state. If the selected level was completed and no
+unfinished board remains, the next unlocked level opens even if Next was not
+pressed before closing. Album/map thumbnails show the assigned puzzle.
 
 ### Controls
 
@@ -65,8 +71,9 @@ migrated automatically.
 
 ### Levels
 
-- Levels 1-3 are small hand-made pictures.
-- Later levels are generated from seed = level number, growing from 5x5 to
+- New levels use independently randomized, persisted seeds. Existing saves retain
+  their previously exposed puzzles, including the original first three pictures.
+- Grid difficulty grows from 5x5 to
   7x7, 8x8, 10x10, 12x12 and 15x15 (level 46+).
 - See `harness/adrs/adr-line-solvable-generator.md` for how the generator
   and line solver guarantee a unique, guess-free solution.
