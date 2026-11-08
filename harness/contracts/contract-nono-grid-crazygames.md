@@ -3,6 +3,7 @@ id: contract-nono-grid-crazygames
 title: Deliver the NonoGrid CrazyGames web bundle
 status: active
 related_specs:
+  - feature-daily-puzzle
   - feature-nono-grid-crazygames
   - feature-sound-effects
   - feature-retention-polish

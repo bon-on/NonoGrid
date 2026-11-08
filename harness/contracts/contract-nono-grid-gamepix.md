@@ -3,6 +3,7 @@ id: contract-nono-grid-gamepix
 title: Deliver the NonoGrid GamePix web bundle
 status: active
 related_specs:
+  - feature-daily-puzzle
   - feature-nono-grid-gamepix
 evidence_files:
   - docs/gamepix.md

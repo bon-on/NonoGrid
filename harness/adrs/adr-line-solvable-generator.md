@@ -3,6 +3,8 @@ id: adr-line-solvable-generator
 title: Generate levels from seeded random grids accepted only when line logic solves them
 status: accepted
 related_specs:
+  - feature-collection-sets
+  - feature-daily-puzzle
   - feature-logic-hints
   - feature-nono-grid-mvp
   - feature-how-to-play-tutorial

@@ -3,6 +3,7 @@ id: adr-nono-grid-gamepix-web
 title: Select the GamePix build with a GAMEPIX flag and the no-op platform
 status: accepted
 related_specs:
+  - feature-daily-puzzle
   - feature-nono-grid-gamepix
   - feature-retention-polish
 ---

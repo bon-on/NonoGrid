@@ -3,6 +3,7 @@ id: adr-nono-grid-crazygames-web
 title: Use a build flag and a platform adapter for the CrazyGames build
 status: accepted
 related_specs:
+  - feature-daily-puzzle
   - feature-nono-grid-crazygames
   - feature-sound-effects
   - feature-retention-polish
