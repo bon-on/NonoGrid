@@ -41,6 +41,14 @@ if grep -q -e 'bon-on.github.io' "$INDEX"; then
   exit 1
 fi
 
+# Copied daily results may only carry the CrazyGames page (from the SDK),
+# never the GitHub Pages link (feature-daily-puzzle).
+[[ -s "$OUT/main.dart.js" ]] || { echo "error: main.dart.js missing" >&2; exit 1; }
+if grep -q -e 'bon-on.github.io' "$OUT/main.dart.js"; then
+  echo "error: hub link present in main.dart.js" >&2
+  exit 1
+fi
+
 if ! grep -q -e 'user-select: none' "$INDEX"; then
   echo "error: user-select rule missing from index.html" >&2
   exit 1

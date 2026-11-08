@@ -51,7 +51,13 @@ grep -qx 'index.html' <<<"$zip_list" || fail "index.html is not at the zip root"
 file_count=$(find "$OUT" -type f | wc -l | tr -d ' ')
 total_kb=$(du -sk "$OUT" | cut -f1)
 zip_kb=$(du -sk "$ZIP" | cut -f1)
-cg_count=$(grep -ci crazygames "$OUT/main.dart.js" || true)
+JS="$OUT/main.dart.js"
+[[ -s "$JS" ]] || fail "main.dart.js missing"
+cg_count=$(grep -ci crazygames "$JS" || true)
+# GamePix forbids outbound links: no portal or hub URL may ship in the code
+# (feature-daily-puzzle copy text has no link in this build).
+(( cg_count == 0 )) || fail "'crazygames' found in main.dart.js"
+if grep -q -e 'bon-on.github.io' "$JS"; then fail "hub link found in main.dart.js"; fi
 echo "GamePix bundle: $OUT ($file_count files, ${total_kb}KB)"
 echo "Upload zip: $ZIP (${zip_kb}KB)"
 echo "'crazygames' matches in main.dart.js: $cg_count"
