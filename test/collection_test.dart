@@ -48,7 +48,6 @@ void main() {
       expect(setProgress(0, solved).complete, isTrue);
       final sets = visibleSets(14, solved);
       expect(sets.map((s) => s.index), [0, 1]);
-      expect(visibleSets(14, solved, solvedLevels: [35]).length, 4);
     });
 
     test('next goal: fewest missing, ties to the earlier set', () {
@@ -103,6 +102,29 @@ void main() {
         expect(s.setGoal!.level, 14);
         expect(r.setGoal!.missing, 7);
       }();
+    });
+
+    test('huge or extra record keys never blow up the album', () async {
+      SharedPreferences.setMockInitialValues({
+        GameStorage.progressKey: jsonEncode({
+          'version': 2,
+          'level': 3,
+          'maxCleared': 2,
+          'legacyThrough': 3,
+          'records': {
+            '1': {'stars': 1},
+            '2': {'stars': 1},
+            '99999999999': {'stars': 3},
+            '5000000': {'stars': 2},
+          },
+        }),
+      });
+      final s = await GameStorage.open(seedSource: () => 1);
+      expect(s.maxCleared, 2);
+      expect(s.albumSets.length, 1, reason: 'bounded by the open level');
+      expect(s.stars(99999999999), 0, reason: 'out-of-range key dropped');
+      final r = await s.recordClear(3, 20);
+      expect(r.setGoal!.level, 4);
     });
 
     test('damaged setsAwarded values never break progress', () async {

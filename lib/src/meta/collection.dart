@@ -61,17 +61,10 @@ SetProgress setProgress(int index, bool Function(int level) isSolved) {
   return SetProgress(index, solved);
 }
 
-/// Sets from the first one through the set holding [unlocked] (and any set
-/// with a solved level beyond it).
-List<SetProgress> visibleSets(
-  int unlocked,
-  bool Function(int level) isSolved, {
-  Iterable<int> solvedLevels = const [],
-}) {
-  var last = setOfLevel(unlocked);
-  for (final l in solvedLevels) {
-    if (setOfLevel(l) > last) last = setOfLevel(l);
-  }
+/// Sets from the first one through the set holding [unlocked]. Bounded by
+/// the open level so a damaged record key can never make this huge.
+List<SetProgress> visibleSets(int unlocked, bool Function(int level) isSolved) {
+  final last = setOfLevel(unlocked);
   return [for (var i = 0; i <= last; i++) setProgress(i, isSolved)];
 }
 

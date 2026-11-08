@@ -259,7 +259,9 @@ class NonoProgressData {
         for (final e in rawRecords.entries) {
           final level = int.tryParse('${e.key}');
           final value = e.value;
-          if (level == null || level < 1 || value is! Map) continue;
+          if (level == null || level < 1 || level > 1 << 30 || value is! Map) {
+            continue;
+          }
           final best = value['best'];
           records[level] = LevelRecord(
             bestSeconds: best is int && best >= 0 ? best : null,
@@ -537,8 +539,7 @@ class GameStorage {
   bool _isSolved(int level) => (_data.records[level]?.stars ?? 0) > 0;
 
   /// Album sets from Set 1 through the one holding the newest open level.
-  List<SetProgress> get albumSets =>
-      visibleSets(unlocked, _isSolved, solvedLevels: _data.records.keys);
+  List<SetProgress> get albumSets => visibleSets(unlocked, _isSolved);
 
   /// Next picture that moves an album set toward completion.
   SetGoal? get setGoal => nextSetGoal(unlocked, _isSolved);
@@ -677,7 +678,13 @@ class GameStorage {
       }
     }
     final previous = dailyResultFor(day);
-    if (previous == null) daily.result = DailyResult(day, seconds, stars);
+    // A reward-free solve of an earlier date (clock moved back) must not
+    // replace the result of a later day, or that day would look unsolved.
+    final latest = daily.result;
+    if (previous == null &&
+        (solve.rewarded || latest == null || day > latest.day)) {
+      daily.result = DailyResult(day, seconds, stars);
+    }
     if (daily.progress?.day == day) daily.progress = null;
     final after = painterLevel;
     await _save();

@@ -245,6 +245,16 @@ void main() {
       }
     });
 
+    test('a clock moved back keeps the later day marked done', () async {
+      final s = await _open({});
+      await s.recordDailyClear(today, 80);
+      final back = await s.recordDailyClear(today - 1, 60);
+      expect(back.daily!.rewarded, isFalse);
+      expect(back.xpGained, 0);
+      expect(s.dailyResultFor(today)!.seconds, 80);
+      expect(s.daily.streak.streak, 1);
+    });
+
     test('a board started before midnight counts for its own day', () async {
       final s = await _open({});
       final r = await s.recordDailyClear(today, 900);

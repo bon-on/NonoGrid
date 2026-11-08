@@ -110,10 +110,15 @@ class SummaryOverlay extends StatefulWidget {
     this.onStar,
     this.onFinished,
     this.onCopy,
+    this.today,
   });
 
   final PaperPalette palette;
   final ClearResult result;
+
+  /// Today's day number, so a daily finished after midnight points to
+  /// today's daily instead of tomorrow's.
+  final int? today;
 
   /// Copies the daily result text; only used for daily solves.
   final VoidCallback? onCopy;
@@ -167,6 +172,12 @@ class _SummaryOverlayState extends State<SummaryOverlay>
   String? _goalText(ClearResult r) {
     final daily = r.daily;
     if (daily != null) {
+      final late = widget.today != null && daily.day < widget.today!;
+      if (late) {
+        return daily.rewarded
+            ? "Solve today's daily for streak ${daily.streak + 1}"
+            : "Today's daily is waiting";
+      }
       return daily.rewarded
           ? 'Come back tomorrow for streak ${daily.streak + 1}'
           : 'Come back tomorrow for a new daily';

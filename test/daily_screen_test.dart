@@ -46,6 +46,7 @@ final int _today = dayIndexOf(_now);
 
 Future<(GameStorage, _FakePlatform, _FakeCopier)> _launch(
   WidgetTester t, {
+  DateTime Function()? clock,
   Size size = const Size(1280, 720),
   Map<String, Object> prefs = const {},
   String? link = pagesShareLink,
@@ -63,7 +64,7 @@ Future<(GameStorage, _FakePlatform, _FakeCopier)> _launch(
       storage: storage,
       tutorialStore: MemoryTutorialStore(seen: true),
       platform: platform,
-      clock: () => _now,
+      clock: clock ?? () => _now,
       copier: fake,
     ),
   );
@@ -237,6 +238,24 @@ void main() {
     expect(find.text('Could not copy'), findsOneWidget);
     await t.pumpAndSettle(const Duration(seconds: 2));
     expect(find.text('Could not copy'), findsNothing);
+  });
+
+  testWidgets('a daily finished after midnight counts for its day', (t) async {
+    var now = _now;
+    final (storage, _, _) = await _launch(t, clock: () => now);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyD);
+    await t.pumpAndSettle();
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pumpAndSettle();
+    now = DateTime(2026, 11, 9, 0, 10);
+    await _solve(t, storage.dailyPuzzleFor(_today));
+    await t.pumpAndSettle();
+    expect(storage.dailyResultFor(_today), isNotNull);
+    expect(storage.dailyResultFor(_today + 1), isNull);
+    expect(find.text("Solve today's daily for streak 2"), findsOneWidget);
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pumpAndSettle();
+    expect(find.text('New'), findsOneWidget, reason: 'next day is new');
   });
 
   testWidgets('a missed day shows the grace keeping the streak', (t) async {

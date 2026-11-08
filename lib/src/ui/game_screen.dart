@@ -1072,6 +1072,7 @@ class _GameScreenState extends State<GameScreen>
             title: _levelTitle,
             onNext: _advance,
             onCopy: result.daily != null ? _copyDaily : null,
+            today: _today,
             onReplay: () {
               _closePanel();
               _restart();
@@ -1496,7 +1497,7 @@ class _GameScreenState extends State<GameScreen>
     palette: p,
     info: _dailyInfo(),
     compact: compact,
-    playing: _dailyDay != null,
+    playing: _dailyDay != null && _dailyDay == _today,
     onTap: _openDaily,
   );
 
