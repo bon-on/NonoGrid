@@ -54,7 +54,8 @@ flutter test --platform chrome test/web --dart-define=GAMEPIX=true --dart-define
 
 ## Verification notes
 
-- `grep -ci crazygames build/gamepix/main.dart.js` should print 0.
+- `tool/build_gamepix.sh` fails when `main.dart.js` contains `crazygames` or
+  `bon-on.github.io`. The daily Copy result text carries no link in this build.
 - `main.dart.js` still contains the engine's default `https://fonts.gstatic.com/s/`
   constant. The app does not request Roboto from there because Roboto is bundled.
 - Roboto comes from the Flutter SDK cache (`material_fonts/`); its license is

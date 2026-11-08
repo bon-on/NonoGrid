@@ -64,6 +64,22 @@ stays in browser localStorage only.
 - While cloud save is active, the page reloads (`user.addAuthListener`) only when the player changes
   to a different player or logs out. If the initial user cannot be read, cloud save stays off.
 
+## Daily puzzle, streak and album sets
+
+- The daily streak, the daily board/result (`daily`) and rewarded album sets
+  (`setsAwarded`) live inside `nonogrid_progress_v2`, so they are part of the
+  `prefs_v1` Data module snapshot like the rest of the progress
+  (`test/crazygames_prefs_store_test.dart` checks the sync).
+- The daily uses the player's local date (`adr-daily-puzzle`); no network.
+- Copy result puts plain text on the clipboard. The only link it may contain
+  is `SDK.game.link` when the SDK reports an https CrazyGames URL; otherwise
+  the text has no link. The GitHub Pages link is not in this bundle
+  (`tool/build_crazygames.sh` fails if `bon-on.github.io` appears in
+  `main.dart.js`). The game never navigates to the link.
+- Clipboard access inside the portal iframe depends on its permissions
+  policy; when both the async clipboard and the `execCommand` fallback are
+  blocked the player sees "Could not copy". Not verified on the live portal.
+
 ## Disabled in the CrazyGames build
 
 Nothing needs disabling: the game has no ads, no leaderboard or result upload and no
@@ -77,6 +93,7 @@ hub navigation bar, and `index.html` contains no outbound links.
 - [ ] Prepared covers: 1920x1080, 800x1200, 800x800.
 - [ ] Check loading and gameplay events in the portal QA tool.
 - [ ] Progress Save: set to "Yes, using the Data Module from the CrazyGames SDK".
+- [ ] In portal QA: solve the daily, check the streak survives a reload and a second device (logged in), and try Copy result.
 
 ## Launch verification — 2026-11-06
 
