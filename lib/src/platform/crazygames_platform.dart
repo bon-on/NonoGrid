@@ -115,6 +115,23 @@ class CrazyGamesPlatform extends GamePlatform {
   @override
   bool get isAudioMuted => _settingsMuted;
 
+  /// The CrazyGames game page reported by the SDK (`game.link`), accepted
+  /// only as an https URL on a CrazyGames host so a copied result never
+  /// points off-portal. Null when the SDK is off or has no link.
+  @override
+  String? get shareLink {
+    final sdk = _sdk;
+    if (sdk == null) return null;
+    try {
+      final link = sdk.game.getProperty<JSAny?>('link'.toJS);
+      if (!link.isA<JSString>()) return null;
+      return crazyGamesLinkOrNull((link as JSString).toDart);
+    } catch (error) {
+      debugPrint('CrazyGames SDK link unavailable: $error');
+      return null;
+    }
+  }
+
   /// Settings are optional: older SDK builds without them stay playable.
   void _watchSettings(_Sdk sdk) {
     try {
@@ -159,6 +176,26 @@ class CrazyGamesPlatform extends GamePlatform {
     final crazyGames = globalContext.getProperty<JSObject?>('CrazyGames'.toJS);
     return crazyGames?.getProperty<_Sdk?>('SDK'.toJS);
   }
+}
+
+/// [raw] when it is an https URL on crazygames.com (or a country domain such
+/// as crazygames.fr), otherwise null.
+@visibleForTesting
+String? crazyGamesLinkOrNull(String? raw) {
+  if (raw == null) return null;
+  final uri = Uri.tryParse(raw.trim());
+  if (uri == null ||
+      uri.scheme != 'https' ||
+      uri.hasPort ||
+      uri.userInfo.isNotEmpty) {
+    return null;
+  }
+  final host = uri.host.toLowerCase();
+  final ok = RegExp(
+    r'^([a-z0-9-]+\.)?crazygames\.(com|[a-z]{2}|co\.[a-z]{2}|com\.[a-z]{2})$',
+  ).hasMatch(host);
+  if (!ok) return null;
+  return uri.toString();
 }
 
 extension type _Sdk._(JSObject _) implements JSObject {

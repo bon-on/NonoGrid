@@ -1,3 +1,4 @@
 import 'game_platform.dart';
 
-GamePlatform createGamePlatform() => const NoopGamePlatform();
+GamePlatform createGamePlatform() =>
+    const NoopGamePlatform(shareLink: pagesShareLink);

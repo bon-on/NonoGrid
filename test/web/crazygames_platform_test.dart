@@ -11,7 +11,12 @@ import 'package:nono_grid/src/platform/crazygames_platform.dart';
 
 /// Installs a fake `window.CrazyGames.SDK` and records the calls it receives.
 class _FakeSdk {
-  _FakeSdk({this.environment = 'local', this.initResult, bool? muteAudio}) {
+  _FakeSdk({
+    this.environment = 'local',
+    this.initResult,
+    bool? muteAudio,
+    Object? link,
+  }) {
     final game = JSObject()
       ..setProperty(
         'gameplayStart'.toJS,
@@ -21,6 +26,8 @@ class _FakeSdk {
         'gameplayStop'.toJS,
         (() => calls.add('gameplayStop')).toJS,
       );
+    if (link is String) game.setProperty('link'.toJS, link.toJS);
+    if (link is int) game.setProperty('link'.toJS, link.toJS);
     if (muteAudio != null) {
       final settings = JSObject()
         ..setProperty('muteAudio'.toJS, muteAudio.toJS);
@@ -54,6 +61,48 @@ void _removeSdk() => globalContext.delete('CrazyGames'.toJS);
 
 void main() {
   tearDown(_removeSdk);
+
+  test(
+    'share link comes from the SDK only when it is a CrazyGames URL',
+    () async {
+      const page = 'https://www.crazygames.com/game/nonogrid';
+      _FakeSdk(link: page);
+      final platform = CrazyGamesPlatform();
+      await platform.initialize();
+      expect(platform.shareLink, page);
+
+      for (final bad in <Object?>[null, 42, 'http://www.crazygames.com/x']) {
+        _removeSdk();
+        _FakeSdk(link: bad);
+        final p = CrazyGamesPlatform();
+        await p.initialize();
+        expect(p.shareLink, isNull, reason: '$bad');
+      }
+      _removeSdk();
+      expect(CrazyGamesPlatform().shareLink, isNull, reason: 'no SDK');
+    },
+  );
+
+  test('CrazyGames link validation rejects look-alike hosts', () {
+    expect(
+      crazyGamesLinkOrNull('https://www.crazygames.com/game/x'),
+      'https://www.crazygames.com/game/x',
+    );
+    expect(crazyGamesLinkOrNull('https://crazygames.fr/game/x'), isNotNull);
+    expect(crazyGamesLinkOrNull('https://www.crazygames.co.uk/x'), isNotNull);
+    for (final bad in [
+      'https://crazygames.evil.com/x',
+      'https://evilcrazygames.com/x',
+      'https://www.crazygames.com.evil.net/x',
+      'https://user@www.crazygames.com/x',
+      'https://www.crazygames.com:8443/x',
+      'javascript:alert(1)',
+      'https://bon-on.github.io/NonoGrid/',
+      '',
+    ]) {
+      expect(crazyGamesLinkOrNull(bad), isNull, reason: bad);
+    }
+  });
 
   test(
     'platform mute follows settings.muteAudio and its change listener',

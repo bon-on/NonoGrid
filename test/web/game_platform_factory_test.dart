@@ -7,6 +7,7 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nono_grid/src/platform/crazygames_platform.dart';
 import 'package:nono_grid/src/platform/game_platform.dart';
+import 'package:nono_grid/src/share/result_copy_web.dart';
 
 void main() {
   const gamePix = bool.fromEnvironment('GAMEPIX');
@@ -23,6 +24,22 @@ void main() {
     } else {
       expect(platform, isA<NoopGamePlatform>());
     }
+  });
+
+  test('share link follows the build flavor', () {
+    final platform = createGamePlatform();
+    if (gamePix) {
+      expect(platform.shareLink, isNull);
+    } else if (crazyGames) {
+      // No SDK in this test page: no link rather than a guessed one.
+      expect(platform.shareLink, isNull);
+    } else {
+      expect(platform.shareLink, pagesShareLink);
+    }
+  });
+
+  test('web copy fallback never throws', () {
+    expect(webCopyFallback('NonoGrid Daily'), isA<bool>());
   });
 
   test('portal platforms register no results and show no ads', () {

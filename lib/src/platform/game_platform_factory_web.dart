@@ -7,8 +7,9 @@ const bool _gamePixBuild = bool.fromEnvironment('GAMEPIX');
 /// GAMEPIX (`--dart-define=GAMEPIX=true`) wins over CRAZYGAMES and uses the
 /// no-op platform, so the GamePix bundle contains no SDK adapter at all.
 /// Both flags are compile-time constants so the unused branch is tree-shaken.
+/// GamePix gets no share link (no outbound URLs in that bundle).
 GamePlatform createGamePlatform() => _gamePixBuild
     ? const NoopGamePlatform()
     : _crazyGamesBuild
     ? CrazyGamesPlatform()
-    : const NoopGamePlatform();
+    : const NoopGamePlatform(shareLink: pagesShareLink);

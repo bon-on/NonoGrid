@@ -34,10 +34,23 @@ abstract class GamePlatform {
 
   /// The player stopped playing (overlay open, level cleared).
   void gameplayStop();
+
+  /// Public game page appended to copied daily results
+  /// (feature-daily-puzzle); null leaves the text without a link. It is only
+  /// text: the game never opens it.
+  String? get shareLink => null;
 }
 
+/// GitHub Pages game page used in copied results of the Pages and mobile
+/// builds. Referenced only from non-GamePix factory branches, so the GamePix
+/// bundle never contains it.
+const String pagesShareLink = 'https://bon-on.github.io/NonoGrid/';
+
 class NoopGamePlatform extends GamePlatform {
-  const NoopGamePlatform();
+  const NoopGamePlatform({this.shareLink});
+
+  @override
+  final String? shareLink;
 
   @override
   Future<void> initialize() async {}
