@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "kind": "cross-review",
+  "reviewer": "claude",
+  "model": null,
+  "root": "<repo>",
+  "command": [
+    "claude",
+    "-p",
+    "--output-format",
+    "text",
+    "--no-session-persistence",
+    "--strict-mcp-config",
+    "--permission-mode",
+    "dontAsk",
+    "--tools",
+    "Read,Grep,Glob",
+    "--allowedTools",
+    "Read,Grep,Glob"
+  ],
+  "target": {
+    "description": "working tree against b13fc5f0a402663460efe2529a5f119a30d42c56 (b13fc5f0a402663460efe2529a5f119a30d42c56) including untracked files",
+    "base": "b13fc5f0a402663460efe2529a5f119a30d42c56",
+    "head": "b13fc5f0a402663460efe2529a5f119a30d42c56",
+    "files": [
+      "docs/crazygames.md",
+      "harness/adrs/adr-line-solvable-generator.md",
+      "harness/adrs/adr-logic-hints.md",
+      "harness/contracts/contract-nono-grid-mvp.md",
+      "harness/specs/feature-logic-hints.md",
+      "harness/specs/feature-nono-grid-crazygames.md",
+      "lib/src/logic/logic_hint.dart",
+      "lib/src/ui/game_screen.dart",
+      "reports/crazygames-launch-verification-2026-11-06.md",
+      "test/game_platform_flow_test.dart",
+      "test/logic_hint_screen_test.dart",
+      "test/logic_hint_test.dart"
+    ],
+    "diffSha256": "42122db75530eafa74ea01dba76b1763cb5fd6972edfc0e90b2ced206e33eb4e",
+    "diffTruncated": false
+  },
+  "spec": "harness/specs/feature-nono-grid-crazygames.md",
+  "inputs": [
+    "docs/crazygames.md",
+    "harness/adrs/adr-line-solvable-generator.md",
+    "harness/adrs/adr-logic-hints.md",
+    "harness/contracts/contract-nono-grid-mvp.md",
+    "harness/specs/feature-logic-hints.md",
+    "harness/specs/feature-nono-grid-crazygames.md",
+    "lib/src/logic/logic_hint.dart",
+    "lib/src/ui/game_screen.dart",
+    "reports/crazygames-launch-verification-2026-11-06.md",
+    "test/game_platform_flow_test.dart",
+    "test/logic_hint_screen_test.dart",
+    "test/logic_hint_test.dart"
+  ],
+  "absent": [],
+  "before": {
+    "docs/crazygames.md": "b4cb25b4518dd71599050eb26949f91b6f0856fa12666282d87d5ccbc636663d",
+    "harness/adrs/adr-line-solvable-generator.md": "85568f41067d0a6a1d1d6be076e294c17b656270c98caea6ab863e4c9d613496",
+    "harness/adrs/adr-logic-hints.md": "f79fb1905c2aece55bcfea328a1f391a410abe4bb8a60bd383ff3179ac2de497",
+    "harness/contracts/contract-nono-grid-mvp.md": "43e5bc3b8b63d84293c18e6989a4ba07e5f24be120416debbc975479cc2966d9",
+    "harness/specs/feature-logic-hints.md": "55c6390c962ae1433587c4d9d705d7c01a92bd1e0e5913adbaec3e9325d9ac33",
+    "harness/specs/feature-nono-grid-crazygames.md": "80e9b99fc1d322681738ec406b4370e494987bec584e57804fa5c81ef95dc1b6",
+    "lib/src/logic/logic_hint.dart": "6a197c1cac5369ebd271ff980e9fdf8329230826c5383e0c1e0b8f76932a03a1",
+    "lib/src/ui/game_screen.dart": "3d45fa9a38a8b1c164e305ac8967d3bd6d874fa790e96064c912a42b6583055e",
+    "reports/crazygames-launch-verification-2026-11-06.md": "79642ba28b4b771da091abdcb90db82768e94c67046af32dd2e176b2763f3c50",
+    "test/game_platform_flow_test.dart": "f701753521c357f1c6536adfcafb5c06d2903dbdc131f6f12cddd6658c24a662",
+    "test/logic_hint_screen_test.dart": "a3ffe7ff9ad38caa7452dc266fc26f77917f65b4ddb393322b3cb29058f4987b",
+    "test/logic_hint_test.dart": "0becf68371d27f4a44f547bc48ad8bbd972d052dc3659ca12a4ee99781154029"
+  },
+  "after": {
+    "docs/crazygames.md": "b4cb25b4518dd71599050eb26949f91b6f0856fa12666282d87d5ccbc636663d",
+    "harness/adrs/adr-line-solvable-generator.md": "85568f41067d0a6a1d1d6be076e294c17b656270c98caea6ab863e4c9d613496",
+    "harness/adrs/adr-logic-hints.md": "f79fb1905c2aece55bcfea328a1f391a410abe4bb8a60bd383ff3179ac2de497",
+    "harness/contracts/contract-nono-grid-mvp.md": "43e5bc3b8b63d84293c18e6989a4ba07e5f24be120416debbc975479cc2966d9",
+    "harness/specs/feature-logic-hints.md": "55c6390c962ae1433587c4d9d705d7c01a92bd1e0e5913adbaec3e9325d9ac33",
+    "harness/specs/feature-nono-grid-crazygames.md": "80e9b99fc1d322681738ec406b4370e494987bec584e57804fa5c81ef95dc1b6",
+    "lib/src/logic/logic_hint.dart": "6a197c1cac5369ebd271ff980e9fdf8329230826c5383e0c1e0b8f76932a03a1",
+    "lib/src/ui/game_screen.dart": "3d45fa9a38a8b1c164e305ac8967d3bd6d874fa790e96064c912a42b6583055e",
+    "reports/crazygames-launch-verification-2026-11-06.md": "79642ba28b4b771da091abdcb90db82768e94c67046af32dd2e176b2763f3c50",
+    "test/game_platform_flow_test.dart": "f701753521c357f1c6536adfcafb5c06d2903dbdc131f6f12cddd6658c24a662",
+    "test/logic_hint_screen_test.dart": "a3ffe7ff9ad38caa7452dc266fc26f77917f65b4ddb393322b3cb29058f4987b",
+    "test/logic_hint_test.dart": "0becf68371d27f4a44f547bc48ad8bbd972d052dc3659ca12a4ee99781154029"
+  },
+  "unchanged": true,
+  "startedAt": "2026-11-06T14:05:59.039Z",
+  "finishedAt": "2026-11-06T14:06:43.386Z",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "verdict": "approve with comments",
+  "findings": {
+    "critical": 0,
+    "high": 0,
+    "medium": 3,
+    "low": 3
+  },
+  "passed": true,
+  "logs": [
+    {
+      "file": "prompt.md",
+      "sha256": "6e739a1cca9d84c7f8a0ae3667bfb0896cce73492322ee6a45ca0b6c41eddf59"
+    },
+    {
+      "file": "diff.patch",
+      "sha256": "42122db75530eafa74ea01dba76b1763cb5fd6972edfc0e90b2ced206e33eb4e"
+    },
+    {
+      "file": "review.md",
+      "sha256": "5672ea26ba033dd5d8f8bfa6f0c55b20ac2f198fb6a836cdcdb536bf3ad3941a"
+    },
+    {
+      "file": "stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "notVerified": [
+    "Correctness of the findings",
+    "Completeness of the review",
+    "Execution of project checks"
+  ],
+  "evidenceSanitization": "Absolute personal paths redacted in this distributable copy; exact CLI originals retained in temporary verification evidence."
+}

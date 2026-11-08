@@ -67,7 +67,50 @@ Future<void> _solveLevel1(WidgetTester t) async {
   await t.pumpAndSettle();
 }
 
+// Mirror the browser's inactive transition on both sides of hidden.
+void _setLifecycle(WidgetTester tester, AppLifecycleState state) {
+  if ((state == AppLifecycleState.hidden &&
+          tester.binding.lifecycleState == AppLifecycleState.resumed) ||
+      (state == AppLifecycleState.resumed &&
+          tester.binding.lifecycleState == AppLifecycleState.hidden)) {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+  }
+  tester.binding.handleAppLifecycleStateChanged(state);
+}
+
 void main() {
+  testWidgets('background pauses once and resume respects overlays', (
+    tester,
+  ) async {
+    final platform = await _launch(tester, tutorialSeen: true);
+    expect(platform.events, ['start']);
+    addTearDown(() => _setLifecycle(tester, AppLifecycleState.resumed));
+    _setLifecycle(tester, AppLifecycleState.inactive);
+    await tester.pump();
+    _setLifecycle(tester, AppLifecycleState.hidden);
+    await tester.pump();
+    expect(platform.events, ['start', 'stop']);
+    _setLifecycle(tester, AppLifecycleState.resumed);
+    await tester.pump();
+    expect(platform.events, ['start', 'stop', 'start']);
+    await tester.tap(find.byKey(const Key('how-to-play-button')));
+    await tester.pump();
+    expect(platform.events, ['start', 'stop', 'start', 'stop']);
+    _setLifecycle(tester, AppLifecycleState.hidden);
+    await tester.pump();
+    _setLifecycle(tester, AppLifecycleState.resumed);
+    await tester.pump();
+    expect(platform.events, [
+      'start',
+      'stop',
+      'start',
+      'stop',
+    ], reason: 'an open tutorial stays stopped after resume');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(platform.events, ['start', 'stop', 'start', 'stop', 'start']);
+  });
+
   testWidgets('seen tutorial: start, overlay stop/start, restart no dupes', (
     t,
   ) async {

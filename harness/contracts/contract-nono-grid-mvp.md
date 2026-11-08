@@ -3,6 +3,7 @@ id: contract-nono-grid-mvp
 title: Deliver the NonoGrid MVP with line-solvable generated levels
 status: active
 related_specs:
+  - feature-logic-hints
   - feature-nono-grid-mvp
   - feature-how-to-play-tutorial
   - feature-game-hub-navigation

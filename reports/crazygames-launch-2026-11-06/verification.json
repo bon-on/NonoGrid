@@ -1,0 +1,57 @@
+{
+  "generated_utc": "2026-11-06T15:20:47.535754+00:00",
+  "game": "NonoGrid",
+  "base_commit": "b13fc5f0a402663460efe2529a5f119a30d42c56",
+  "head_commit": "b13fc5f0a402663460efe2529a5f119a30d42c56",
+  "working_tree_dirty": true,
+  "build_inputs_sha256_at_report": "5eb7aa0439f6c4cd49f22ad5f4f4ac3760d43fa1eee0073f8ffc54d163708919",
+  "commands": [
+    {
+      "argv": "flutter analyze --no-pub",
+      "exit": 0,
+      "evidence": "crazygames-launch-2026-11-06/analyze.log"
+    },
+    {
+      "argv": "flutter test --no-pub --reporter expanded",
+      "exit": 0,
+      "evidence": "crazygames-launch-2026-11-06/vm-tests.log"
+    },
+    {
+      "argv": "flutter test --no-pub --platform chrome test/web --timeout 60s --reporter expanded",
+      "exit": 0,
+      "evidence": "crazygames-launch-2026-11-06/chrome-tests.log"
+    },
+    {
+      "argv": "node <harness-lab>/dist/index.js audit . --format md",
+      "exit": 0,
+      "evidence": "crazygames-launch-2026-11-06/harness-audit.log"
+    },
+    {
+      "argv": "flutter build web --release --no-pub --base-href /NonoGrid/",
+      "exit": 0,
+      "evidence": "crazygames-launch-2026-11-06/pages-build.log"
+    },
+    {
+      "argv": "bash tool/build_crazygames.sh",
+      "exit": 0,
+      "evidence": "crazygames-launch-2026-11-06/crazygames-build.log"
+    }
+  ],
+  "vm_tests": 145,
+  "chrome_tests": 17,
+  "zip": {
+    "sha256": "1134c96b1b891027a81b4d25e101b8228fedacf18cf26efc3f0ec7caa43eee73",
+    "zip_bytes": 12524796,
+    "files": 43,
+    "unpacked_bytes": 30691581,
+    "root_index": true,
+    "relative_base": true,
+    "sdk_v3": true,
+    "no_hub_links": true
+  },
+  "independent_review": {
+    "verdict": "approve",
+    "findings": 0
+  },
+  "portal_qa_established_by_local_checks": false
+}

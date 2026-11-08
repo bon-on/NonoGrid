@@ -13,6 +13,8 @@ import '../audio/sound_fx.dart';
 import '../audio/sound_mute_store.dart';
 import '../logic/clues.dart';
 import '../logic/game.dart';
+import '../logic/line_solver.dart';
+import '../logic/logic_hint.dart';
 import '../logic/puzzle.dart';
 import '../meta/progress_rules.dart';
 import '../platform/game_platform.dart';
@@ -38,7 +40,7 @@ bool _isBrowserShortcut(KeyEvent e) {
 const double _kHintMinPanelHeight = 440;
 
 /// Overlays other than the tutorial.
-enum _Panel { none, summary, album, levels, themes }
+enum _Panel { none, summary, album, levels, themes, logic }
 
 /// Which rows/columns match their clue or hold more filled cells than it.
 class _LineState {
@@ -99,6 +101,7 @@ class _GameScreenState extends State<GameScreen>
   bool _showCursor = false;
   Set<int> _mistakes = {};
   Timer? _mistakeTimer;
+  LogicHint? _logicHint;
   String? _message;
   Timer? _messageTimer;
 
@@ -157,14 +160,18 @@ class _GameScreenState extends State<GameScreen>
   (int, int) _strokeOrigin = (0, 0);
 
   bool get _overlayOpen => _tutorialOpen || _panel != _Panel.none;
-  bool get _inputBlocked => !_tutorialChecked || _overlayOpen;
+  bool get _inputBlocked => !_appActive || !_tutorialChecked || _overlayOpen;
 
   // Whether the platform currently believes gameplay is running.
+  bool _appActive =
+      WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
   bool _gameplayActive = false;
 
   /// Reports gameplay start/stop to the platform exactly on transitions.
   void _syncGameplay() {
-    final wantActive = _tutorialChecked && !_overlayOpen && !_game.isWon;
+    final wantActive =
+        _appActive && _tutorialChecked && !_overlayOpen && !_game.isWon;
     if (wantActive == _gameplayActive) return;
     _gameplayActive = wantActive;
     if (wantActive) {
@@ -456,9 +463,9 @@ class _GameScreenState extends State<GameScreen>
   /// and saves the elapsed time so a reload does not lose it.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _sfx.setAppVisible(
-      state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
-    );
+    _appActive = state == AppLifecycleState.resumed;
+    _sfx.setAppVisible(_appActive);
+    _syncGameplay();
     if (state == AppLifecycleState.resumed) {
       if (_wasRunning && !_overlayOpen) _startClock();
       _wasRunning = false;
@@ -601,6 +608,42 @@ class _GameScreenState extends State<GameScreen>
       unawaited(_storage.clearProgress());
     }
     _syncGameplay();
+  }
+
+  LogicHint _deduceHint() => findLogicHint(_game.puzzle.clues, [
+    for (final mark in _game.cells)
+      switch (mark) {
+        Mark.empty => kUnknown,
+        Mark.filled => kFilled,
+        Mark.crossed => kEmpty,
+      },
+  ]);
+
+  void _openLogicHint() {
+    if (_game.isWon || _inputBlocked) return;
+    _onStrokeEnd();
+    if (_game.isWon) return;
+    _logicHint = _deduceHint();
+    _openPanel(_Panel.logic);
+  }
+
+  void _applyLogicHint() {
+    if (_panel != _Panel.logic || _game.isWon) return;
+    final hint = _deduceHint();
+    final shown = _logicHint;
+    if (!hint.hasStep ||
+        hint.row != shown?.row ||
+        hint.col != shown?.col ||
+        hint.value != shown?.value) {
+      setState(() => _logicHint = hint);
+      return;
+    }
+    _closePanel();
+    setState(() {
+      _cursor = (hint.row!, hint.col!);
+      _showCursor = true;
+    });
+    _tapAtCursor(hint.value == kFilled ? Tool.fill : Tool.cross);
   }
 
   void _check() {
@@ -770,6 +813,8 @@ class _GameScreenState extends State<GameScreen>
         }
         if (all[i] != _themeSel) setState(() => _themeSel = all[i]);
         if (enter) _applyTheme(_themeSel);
+      case _Panel.logic:
+        break;
       case _Panel.none:
         break;
     }
@@ -811,6 +856,33 @@ class _GameScreenState extends State<GameScreen>
   List<Widget> _overlays(PaperPalette p) {
     final result = _result;
     return [
+      if (_panel == _Panel.logic && _logicHint != null)
+        Positioned.fill(
+          child: ColoredBox(
+            color: Colors.black54,
+            child: AlertDialog(
+              title: const Text('Logic hint'),
+              content: SingleChildScrollView(
+                child: Text(
+                  '${_logicHint!.explanation}\n\n'
+                  'This assumes your current fills and X marks are correct. '
+                  'It does not check the hidden picture.\n\n'
+                  'Logic hints do not cost stars or XP. Check still affects '
+                  'the No mistakes star when it finds a wrong fill.',
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: _closePanel, child: const Text('Close')),
+                if (_logicHint!.hasStep)
+                  TextButton(
+                    key: const Key('apply-logic-hint'),
+                    onPressed: _applyLogicHint,
+                    child: const Text('Apply step'),
+                  ),
+              ],
+            ),
+          ),
+        ),
       if (_panel == _Panel.summary && result != null)
         Positioned.fill(
           child: SummaryOverlay(
@@ -1202,7 +1274,11 @@ class _GameScreenState extends State<GameScreen>
     ],
   );
 
-  Widget _toolButtons(PaperPalette p, {required bool vertical}) {
+  Widget _toolButtons(
+    PaperPalette p, {
+    required bool vertical,
+    bool dense = false,
+  }) {
     final items = <Widget>[
       PaperButton(
         key: const Key('tool-fill'),
@@ -1210,7 +1286,7 @@ class _GameScreenState extends State<GameScreen>
         label: 'Fill',
         icon: Icons.square_rounded,
         selected: _tool == Tool.fill,
-        compact: !vertical,
+        compact: !vertical || dense,
         expand: vertical,
         onPressed: () => setState(() => _tool = Tool.fill),
       ),
@@ -1220,7 +1296,7 @@ class _GameScreenState extends State<GameScreen>
         label: 'Mark X',
         icon: Icons.close_rounded,
         selected: _tool == Tool.cross,
-        compact: !vertical,
+        compact: !vertical || dense,
         expand: vertical,
         onPressed: () => setState(() => _tool = Tool.cross),
       ),
@@ -1231,6 +1307,15 @@ class _GameScreenState extends State<GameScreen>
         compact: true,
         expand: vertical,
         onPressed: _game.canUndo ? _undo : null,
+      ),
+      PaperButton(
+        key: const Key('logic-hint'),
+        palette: p,
+        label: 'Logic hint',
+        icon: Icons.lightbulb_outline,
+        compact: true,
+        expand: vertical,
+        onPressed: _game.isWon || _inputBlocked ? null : _openLogicHint,
       ),
       PaperButton(
         palette: p,
@@ -1255,7 +1340,7 @@ class _GameScreenState extends State<GameScreen>
         children: [
           for (var i = 0; i < items.length; i++) ...[
             items[i],
-            SizedBox(height: i == 1 ? 16 : 8),
+            SizedBox(height: dense ? 4 : (i == 1 ? 16 : 8)),
           ],
         ],
       );
@@ -1344,7 +1429,7 @@ class _GameScreenState extends State<GameScreen>
                     ? _winBox(p, vertical: true)
                     : _game.isWon
                     ? const SizedBox(key: ValueKey('none'), height: 1)
-                    : _toolButtons(p, vertical: true),
+                    : _toolButtons(p, vertical: true, dense: c.maxHeight < 400),
               ),
               const SizedBox(height: 12),
               // Short panels (landscape phones) drop the key hint, which the

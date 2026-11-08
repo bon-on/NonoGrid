@@ -1,0 +1,346 @@
+diff --git a/docs/crazygames.md b/docs/crazygames.md
+index 4cd3edc..58808d6 100644
+--- a/docs/crazygames.md
++++ b/docs/crazygames.md
+@@ -74,6 +74,13 @@ hub navigation bar, and `index.html` contains no outbound links.
+ - [ ] Submit through Basic Launch first (ads are not allowed there).
+ - [ ] Orientation: portrait and landscape both work; the board fits any size.
+ - [ ] Input: mouse/touch and keyboard (see README).
+-- [ ] Covers (not created yet): 1920x1080, 800x1200, 800x800.
++- [ ] Prepared covers: 1920x1080, 800x1200, 800x800.
+ - [ ] Check loading and gameplay events in the portal QA tool.
+ - [ ] Progress Save: set to "Yes, using the Data Module from the CrazyGames SDK".
++
++## Launch verification — 2026-11-06
++
++- Covers are maintained in the workspace marketing folder (`../_marketing/NonoGrid/crazygames-launch/`) in landscape 1920x1080, portrait 800x1200 and square 800x800 sizes.
++- Backgrounding or losing focus pauses SDK gameplay and sound; resume starts gameplay only if no tutorial/menu/result is open. Repeated lifecycle transitions do not duplicate events.
++- Local automated SDK tests use a fake SDK. Final portal QA must still confirm the real uploaded build's loading, inputs, audio mute and account progress persistence.
++- The self-contained release packet is prepared at `../_marketing/crazygames-launch-2026-11-06/NonoGrid/` (ZIP, media and submission metadata). Portal upload and real QA are pending authenticated portal access.
+diff --git a/harness/adrs/adr-line-solvable-generator.md b/harness/adrs/adr-line-solvable-generator.md
+index fc4fad1..93d1b00 100644
+--- a/harness/adrs/adr-line-solvable-generator.md
++++ b/harness/adrs/adr-line-solvable-generator.md
+@@ -3,6 +3,7 @@ id: adr-line-solvable-generator
+ title: Generate levels from seeded random grids accepted only when line logic solves them
+ status: accepted
+ related_specs:
++  - feature-logic-hints
+   - feature-nono-grid-mvp
+   - feature-how-to-play-tutorial
+   - feature-retention-polish
+diff --git a/harness/contracts/contract-nono-grid-mvp.md b/harness/contracts/contract-nono-grid-mvp.md
+index 8d99b65..8af3ab1 100644
+--- a/harness/contracts/contract-nono-grid-mvp.md
++++ b/harness/contracts/contract-nono-grid-mvp.md
+@@ -3,6 +3,7 @@ id: contract-nono-grid-mvp
+ title: Deliver the NonoGrid MVP with line-solvable generated levels
+ status: active
+ related_specs:
++  - feature-logic-hints
+   - feature-nono-grid-mvp
+   - feature-how-to-play-tutorial
+   - feature-game-hub-navigation
+diff --git a/harness/specs/feature-nono-grid-crazygames.md b/harness/specs/feature-nono-grid-crazygames.md
+index c993772..e51875a 100644
+--- a/harness/specs/feature-nono-grid-crazygames.md
++++ b/harness/specs/feature-nono-grid-crazygames.md
+@@ -53,6 +53,7 @@ Out of scope: ads, gameplay changes, portal submission. (Data/User modules were
+ `feature-crazygames-cloud-save`.)
+ 
+ ## Acceptance Criteria
++- Losing app/tab focus stops SDK gameplay once and pauses active timers/simulation; resume starts only when no tutorial/menu/result is open. Lifecycle transitions never duplicate events.
+ - `flutter analyze` and `flutter test` pass.
+ - A widget test with a recording fake platform shows the call order: start
+   after launch (when the tutorial is already seen), stop while the overlay is
+@@ -77,3 +78,8 @@ Out of scope: ads, gameplay changes, portal submission. (Data/User modules were
+ - tool/build_crazygames.sh
+ - node <harness-lab>/dist/index.js audit . --format md
+ - reports/nono-grid-crazygames-verification.md
++
++## Launch hardening — 2026-11-06
++
++The screen observes app lifecycle so hidden or inactive tabs pause play and sound, then resume only an active run. Widget regression checks cover background/resume and overlays.
++Short landscape tool panels use compact controls and spacing so the Logic hint action does not push sound/help below the viewport. Existing 844x390 layout regression must pass.
+diff --git a/lib/src/ui/game_screen.dart b/lib/src/ui/game_screen.dart
+index 7078a55..b089f6f 100644
+--- a/lib/src/ui/game_screen.dart
++++ b/lib/src/ui/game_screen.dart
+@@ -13,6 +13,8 @@ import '../audio/sound_fx.dart';
+ import '../audio/sound_mute_store.dart';
+ import '../logic/clues.dart';
+ import '../logic/game.dart';
++import '../logic/line_solver.dart';
++import '../logic/logic_hint.dart';
+ import '../logic/puzzle.dart';
+ import '../meta/progress_rules.dart';
+ import '../platform/game_platform.dart';
+@@ -38,7 +40,7 @@ bool _isBrowserShortcut(KeyEvent e) {
+ const double _kHintMinPanelHeight = 440;
+ 
+ /// Overlays other than the tutorial.
+-enum _Panel { none, summary, album, levels, themes }
++enum _Panel { none, summary, album, levels, themes, logic }
+ 
+ /// Which rows/columns match their clue or hold more filled cells than it.
+ class _LineState {
+@@ -99,6 +101,7 @@ class _GameScreenState extends State<GameScreen>
+   bool _showCursor = false;
+   Set<int> _mistakes = {};
+   Timer? _mistakeTimer;
++  LogicHint? _logicHint;
+   String? _message;
+   Timer? _messageTimer;
+ 
+@@ -157,14 +160,18 @@ class _GameScreenState extends State<GameScreen>
+   (int, int) _strokeOrigin = (0, 0);
+ 
+   bool get _overlayOpen => _tutorialOpen || _panel != _Panel.none;
+-  bool get _inputBlocked => !_tutorialChecked || _overlayOpen;
++  bool get _inputBlocked => !_appActive || !_tutorialChecked || _overlayOpen;
+ 
+   // Whether the platform currently believes gameplay is running.
++  bool _appActive =
++      WidgetsBinding.instance.lifecycleState == null ||
++      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+   bool _gameplayActive = false;
+ 
+   /// Reports gameplay start/stop to the platform exactly on transitions.
+   void _syncGameplay() {
+-    final wantActive = _tutorialChecked && !_overlayOpen && !_game.isWon;
++    final wantActive =
++        _appActive && _tutorialChecked && !_overlayOpen && !_game.isWon;
+     if (wantActive == _gameplayActive) return;
+     _gameplayActive = wantActive;
+     if (wantActive) {
+@@ -456,9 +463,9 @@ class _GameScreenState extends State<GameScreen>
+   /// and saves the elapsed time so a reload does not lose it.
+   @override
+   void didChangeAppLifecycleState(AppLifecycleState state) {
+-    _sfx.setAppVisible(
+-      state == AppLifecycleState.resumed || state == AppLifecycleState.inactive,
+-    );
++    _appActive = state == AppLifecycleState.resumed;
++    _sfx.setAppVisible(_appActive);
++    _syncGameplay();
+     if (state == AppLifecycleState.resumed) {
+       if (_wasRunning && !_overlayOpen) _startClock();
+       _wasRunning = false;
+@@ -603,6 +610,42 @@ class _GameScreenState extends State<GameScreen>
+     _syncGameplay();
+   }
+ 
++  LogicHint _deduceHint() => findLogicHint(_game.puzzle.clues, [
++    for (final mark in _game.cells)
++      switch (mark) {
++        Mark.empty => kUnknown,
++        Mark.filled => kFilled,
++        Mark.crossed => kEmpty,
++      },
++  ]);
++
++  void _openLogicHint() {
++    if (_game.isWon || _inputBlocked) return;
++    _onStrokeEnd();
++    if (_game.isWon) return;
++    _logicHint = _deduceHint();
++    _openPanel(_Panel.logic);
++  }
++
++  void _applyLogicHint() {
++    if (_panel != _Panel.logic || _game.isWon) return;
++    final hint = _deduceHint();
++    final shown = _logicHint;
++    if (!hint.hasStep ||
++        hint.row != shown?.row ||
++        hint.col != shown?.col ||
++        hint.value != shown?.value) {
++      setState(() => _logicHint = hint);
++      return;
++    }
++    _closePanel();
++    setState(() {
++      _cursor = (hint.row!, hint.col!);
++      _showCursor = true;
++    });
++    _tapAtCursor(hint.value == kFilled ? Tool.fill : Tool.cross);
++  }
++
+   void _check() {
+     if (_game.isWon) return;
+     final wrong = _game.mistakes();
+@@ -770,6 +813,8 @@ class _GameScreenState extends State<GameScreen>
+         }
+         if (all[i] != _themeSel) setState(() => _themeSel = all[i]);
+         if (enter) _applyTheme(_themeSel);
++      case _Panel.logic:
++        break;
+       case _Panel.none:
+         break;
+     }
+@@ -811,6 +856,33 @@ class _GameScreenState extends State<GameScreen>
+   List<Widget> _overlays(PaperPalette p) {
+     final result = _result;
+     return [
++      if (_panel == _Panel.logic && _logicHint != null)
++        Positioned.fill(
++          child: ColoredBox(
++            color: Colors.black54,
++            child: AlertDialog(
++              title: const Text('Logic hint'),
++              content: SingleChildScrollView(
++                child: Text(
++                  '${_logicHint!.explanation}\n\n'
++                  'This assumes your current fills and X marks are correct. '
++                  'It does not check the hidden picture.\n\n'
++                  'Logic hints do not cost stars or XP. Check still affects '
++                  'the No mistakes star when it finds a wrong fill.',
++                ),
++              ),
++              actions: [
++                TextButton(onPressed: _closePanel, child: const Text('Close')),
++                if (_logicHint!.hasStep)
++                  TextButton(
++                    key: const Key('apply-logic-hint'),
++                    onPressed: _applyLogicHint,
++                    child: const Text('Apply step'),
++                  ),
++              ],
++            ),
++          ),
++        ),
+       if (_panel == _Panel.summary && result != null)
+         Positioned.fill(
+           child: SummaryOverlay(
+@@ -1202,7 +1274,11 @@ class _GameScreenState extends State<GameScreen>
+     ],
+   );
+ 
+-  Widget _toolButtons(PaperPalette p, {required bool vertical}) {
++  Widget _toolButtons(
++    PaperPalette p, {
++    required bool vertical,
++    bool dense = false,
++  }) {
+     final items = <Widget>[
+       PaperButton(
+         key: const Key('tool-fill'),
+@@ -1210,7 +1286,7 @@ class _GameScreenState extends State<GameScreen>
+         label: 'Fill',
+         icon: Icons.square_rounded,
+         selected: _tool == Tool.fill,
+-        compact: !vertical,
++        compact: !vertical || dense,
+         expand: vertical,
+         onPressed: () => setState(() => _tool = Tool.fill),
+       ),
+@@ -1220,7 +1296,7 @@ class _GameScreenState extends State<GameScreen>
+         label: 'Mark X',
+         icon: Icons.close_rounded,
+         selected: _tool == Tool.cross,
+-        compact: !vertical,
++        compact: !vertical || dense,
+         expand: vertical,
+         onPressed: () => setState(() => _tool = Tool.cross),
+       ),
+@@ -1232,6 +1308,15 @@ class _GameScreenState extends State<GameScreen>
+         expand: vertical,
+         onPressed: _game.canUndo ? _undo : null,
+       ),
++      PaperButton(
++        key: const Key('logic-hint'),
++        palette: p,
++        label: 'Logic hint',
++        icon: Icons.lightbulb_outline,
++        compact: true,
++        expand: vertical,
++        onPressed: _game.isWon || _inputBlocked ? null : _openLogicHint,
++      ),
+       PaperButton(
+         palette: p,
+         label: 'Check',
+@@ -1255,7 +1340,7 @@ class _GameScreenState extends State<GameScreen>
+         children: [
+           for (var i = 0; i < items.length; i++) ...[
+             items[i],
+-            SizedBox(height: i == 1 ? 16 : 8),
++            SizedBox(height: dense ? 4 : (i == 1 ? 16 : 8)),
+           ],
+         ],
+       );
+@@ -1344,7 +1429,7 @@ class _GameScreenState extends State<GameScreen>
+                     ? _winBox(p, vertical: true)
+                     : _game.isWon
+                     ? const SizedBox(key: ValueKey('none'), height: 1)
+-                    : _toolButtons(p, vertical: true),
++                    : _toolButtons(p, vertical: true, dense: c.maxHeight < 400),
+               ),
+               const SizedBox(height: 12),
+               // Short panels (landscape phones) drop the key hint, which the
+diff --git a/test/game_platform_flow_test.dart b/test/game_platform_flow_test.dart
+index 1d0ded4..2f971fd 100644
+--- a/test/game_platform_flow_test.dart
++++ b/test/game_platform_flow_test.dart
+@@ -67,7 +67,50 @@ Future<void> _solveLevel1(WidgetTester t) async {
+   await t.pumpAndSettle();
+ }
+ 
++// Mirror the browser's inactive transition on both sides of hidden.
++void _setLifecycle(WidgetTester tester, AppLifecycleState state) {
++  if ((state == AppLifecycleState.hidden &&
++          tester.binding.lifecycleState == AppLifecycleState.resumed) ||
++      (state == AppLifecycleState.resumed &&
++          tester.binding.lifecycleState == AppLifecycleState.hidden)) {
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
++  }
++  tester.binding.handleAppLifecycleStateChanged(state);
++}
++
+ void main() {
++  testWidgets('background pauses once and resume respects overlays', (
++    tester,
++  ) async {
++    final platform = await _launch(tester, tutorialSeen: true);
++    expect(platform.events, ['start']);
++    addTearDown(() => _setLifecycle(tester, AppLifecycleState.resumed));
++    _setLifecycle(tester, AppLifecycleState.inactive);
++    await tester.pump();
++    _setLifecycle(tester, AppLifecycleState.hidden);
++    await tester.pump();
++    expect(platform.events, ['start', 'stop']);
++    _setLifecycle(tester, AppLifecycleState.resumed);
++    await tester.pump();
++    expect(platform.events, ['start', 'stop', 'start']);
++    await tester.tap(find.byKey(const Key('how-to-play-button')));
++    await tester.pump();
++    expect(platform.events, ['start', 'stop', 'start', 'stop']);
++    _setLifecycle(tester, AppLifecycleState.hidden);
++    await tester.pump();
++    _setLifecycle(tester, AppLifecycleState.resumed);
++    await tester.pump();
++    expect(platform.events, [
++      'start',
++      'stop',
++      'start',
++      'stop',
++    ], reason: 'an open tutorial stays stopped after resume');
++    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
++    await tester.pump();
++    expect(platform.events, ['start', 'stop', 'start', 'stop', 'start']);
++  });
++
+   testWidgets('seen tutorial: start, overlay stop/start, restart no dupes', (
+     t,
+   ) async {
+
+--- untracked file: harness/adrs/adr-logic-hints.md (read it in full)
+
+--- untracked file: harness/specs/feature-logic-hints.md (read it in full)
+
+--- untracked file: lib/src/logic/logic_hint.dart (read it in full)
+
+--- untracked file: reports/crazygames-launch-verification-2026-11-06.md (read it in full)
+
+--- untracked file: test/logic_hint_screen_test.dart (read it in full)
+
+--- untracked file: test/logic_hint_test.dart (read it in full)

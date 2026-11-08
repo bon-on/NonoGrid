@@ -53,6 +53,7 @@ Out of scope: ads, gameplay changes, portal submission. (Data/User modules were 
 `feature-crazygames-cloud-save`.)
 
 ## Acceptance Criteria
+- Losing app/tab focus stops SDK gameplay once and pauses active timers/simulation; resume starts only when no tutorial/menu/result is open. Lifecycle transitions never duplicate events.
 - `flutter analyze` and `flutter test` pass.
 - A widget test with a recording fake platform shows the call order: start
   after launch (when the tutorial is already seen), stop while the overlay is
@@ -77,3 +78,8 @@ Out of scope: ads, gameplay changes, portal submission. (Data/User modules were 
 - tool/build_crazygames.sh
 - node <harness-lab>/dist/index.js audit . --format md
 - reports/nono-grid-crazygames-verification.md
+
+## Launch hardening — 2026-11-06
+
+The screen observes app lifecycle so hidden or inactive tabs pause play and sound, then resume only an active run. Widget regression checks cover background/resume and overlays.
+Short landscape tool panels use compact controls and spacing so the Logic hint action does not push sound/help below the viewport. Existing 844x390 layout regression must pass.
