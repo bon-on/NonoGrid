@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'src/audio/sound_fx.dart';
 import 'src/audio/sound_mute_store.dart';
 import 'src/platform/game_platform.dart';
+import 'src/share/result_copy.dart';
 import 'src/storage.dart';
 import 'src/art/paper_palette.dart';
 import 'src/ui/game_screen.dart';
@@ -30,9 +31,13 @@ class NonoGridApp extends StatelessWidget {
     this.platform = const NoopGamePlatform(),
     this.soundMuteStore = const SoundMuteStore(),
     this.onSfxPlayed,
+    this.clock = DateTime.now,
+    this.copier = const ResultCopier(),
   });
 
   final GameStorage storage;
+  final DateTime Function() clock;
+  final ResultCopier copier;
   final TutorialStore? tutorialStore;
   final GamePlatform platform;
   final SoundMuteStore soundMuteStore;
@@ -56,6 +61,8 @@ class NonoGridApp extends StatelessWidget {
         platform: platform,
         soundMuteStore: soundMuteStore,
         onSfxPlayed: onSfxPlayed,
+        clock: clock,
+        copier: copier,
       ),
     );
   }

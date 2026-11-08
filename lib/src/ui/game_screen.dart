@@ -16,11 +16,14 @@ import '../logic/game.dart';
 import '../logic/line_solver.dart';
 import '../logic/logic_hint.dart';
 import '../logic/puzzle.dart';
+import '../meta/daily.dart';
 import '../meta/progress_rules.dart';
 import '../platform/game_platform.dart';
+import '../share/result_copy.dart';
 import '../storage.dart';
 import 'board.dart';
 import 'board_fx.dart';
+import 'daily_ui.dart';
 import 'how_to_play.dart';
 import 'overlays.dart';
 import 'paper_ui.dart';
@@ -40,7 +43,7 @@ bool _isBrowserShortcut(KeyEvent e) {
 const double _kHintMinPanelHeight = 440;
 
 /// Overlays other than the tutorial.
-enum _Panel { none, summary, album, levels, themes, logic }
+enum _Panel { none, summary, album, levels, themes, logic, daily }
 
 /// Which rows/columns match their clue or hold more filled cells than it.
 class _LineState {
@@ -72,9 +75,17 @@ class GameScreen extends StatefulWidget {
     this.platform = const NoopGamePlatform(),
     this.soundMuteStore = const SoundMuteStore(),
     this.onSfxPlayed,
+    this.clock = DateTime.now,
+    this.copier = const ResultCopier(),
   });
 
   final GameStorage storage;
+
+  /// Local time source for the daily puzzle; tests inject a fixed clock.
+  final DateTime Function() clock;
+
+  /// Clipboard access for the daily copy-result text; tests inject a fake.
+  final ResultCopier copier;
 
   /// Receives gameplay start/stop events (CrazyGames SDK on portal builds).
   final GamePlatform platform;
@@ -96,6 +107,11 @@ class _GameScreenState extends State<GameScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   late int _level;
   late NonoGame _game;
+
+  /// Day of the daily puzzle on the board, null while playing levels.
+  int? _dailyDay;
+  String? _toast;
+  Timer? _toastTimer;
   Tool _tool = Tool.fill;
   (int, int) _cursor = (0, 0);
   bool _showCursor = false;
@@ -434,9 +450,11 @@ class _GameScreenState extends State<GameScreen>
   void _maybeOpenSummary() {
     if (!mounted || !_revealDone || _result == null || !_game.isWon) return;
     if (_summaryShown) return;
-    if (_result!.level != _level || _panel != _Panel.none || _tutorialOpen) {
-      return;
-    }
+    final r = _result!;
+    final sameBoard = r.daily == null
+        ? _dailyDay == null && r.level == _level
+        : r.daily!.day == _dailyDay;
+    if (!sameBoard || _panel != _Panel.none || _tutorialOpen) return;
     setState(() {
       _panel = _Panel.summary;
       _summaryShown = true;
@@ -451,6 +469,7 @@ class _GameScreenState extends State<GameScreen>
     _ticker?.cancel();
     _mistakeTimer?.cancel();
     _messageTimer?.cancel();
+    _toastTimer?.cancel();
     _reveal.dispose();
     _fxTicker.dispose();
     _fx.dispose();
@@ -480,6 +499,15 @@ class _GameScreenState extends State<GameScreen>
 
   void _saveProgress() {
     if (_game.isWon) return;
+    final day = _dailyDay;
+    if (day != null) {
+      unawaited(
+        _storage.saveDailyProgress(
+          DailyProgress(day, _game.encode(), _elapsed, mistakes: _mistakeMade),
+        ),
+      );
+      return;
+    }
     unawaited(
       _storage.saveProgress(
         SavedProgress(_level, _game.encode(), _elapsed, mistakes: _mistakeMade),
@@ -487,9 +515,17 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  void _load(int level) {
-    _level = level;
-    _game = NonoGame(_storage.puzzleFor(level));
+  /// Keeps the elapsed time of a running daily board before it is left.
+  void _leaveBoard() {
+    if (_clock.isRunning && !_game.isWon) {
+      _clock.stop();
+      _saveProgress();
+    }
+  }
+
+  /// Puts [puzzle] on the board with a fresh clock and no effects.
+  void _resetBoard(Puzzle puzzle) {
+    _game = NonoGame(puzzle);
     _clock
       ..stop()
       ..reset();
@@ -503,6 +539,13 @@ class _GameScreenState extends State<GameScreen>
     _mistakeMade = false;
     _cursor = (0, 0);
     _fx.clear();
+  }
+
+  void _load(int level) {
+    if (_dailyDay != null) _leaveBoard();
+    _dailyDay = null;
+    _level = level;
+    _resetBoard(_storage.puzzleFor(level));
     final saved = _storage.progress;
     if (saved != null && saved.level == level) {
       if (_game.restore(saved.cells) && !_game.isWon) {
@@ -513,6 +556,105 @@ class _GameScreenState extends State<GameScreen>
       }
     }
     unawaited(_storage.setLevel(level));
+  }
+
+  /// Opens [day]'s daily puzzle, resuming its saved board of that day.
+  void _loadDaily(int day) {
+    _dailyDay = day;
+    _resetBoard(_storage.dailyPuzzleFor(day));
+    final saved = _storage.dailyProgressFor(day);
+    if (saved != null) {
+      if (_game.restore(saved.cells) && !_game.isWon) {
+        _baseSeconds = saved.elapsedSeconds;
+        _mistakeMade = saved.mistakes;
+      } else {
+        _game.restart();
+      }
+    }
+  }
+
+  int get _today => dayIndexOf(widget.clock());
+
+  DailyInfo _dailyInfo() {
+    final today = _today;
+    final live = _dailyDay == today && !_game.isWon ? _elapsed : null;
+    return DailyInfo.of(_storage, today, liveElapsed: live);
+  }
+
+  void _openDaily() {
+    if (_tutorialOpen) return;
+    _onStrokeEnd();
+    _openPanel(_Panel.daily);
+  }
+
+  /// Enter/Play in the daily overlay: start or resume today's daily, or
+  /// close when it is already solved.
+  void _playDaily() {
+    final today = _today;
+    if (_storage.dailyResultFor(today) != null || _dailyDay == today) {
+      _closePanel();
+      return;
+    }
+    _resumeAfterOverlay = false;
+    setState(() {
+      _panel = _Panel.none;
+      _loadDaily(today);
+    });
+    _syncGameplay();
+    _focus.requestFocus();
+  }
+
+  /// Leaves the daily board for the level the player was on.
+  void _backToLevels() {
+    if (_dailyDay == null) return;
+    _resumeAfterOverlay = false;
+    setState(() {
+      _panel = _Panel.none;
+      _load(_storage.level.clamp(1, _storage.unlocked));
+    });
+    _syncGameplay();
+    _focus.requestFocus();
+  }
+
+  /// Copies the result of the latest solved daily (today's, or the board's).
+  Future<void> _copyDaily() async {
+    final day = _dailyDay ?? _today;
+    final result =
+        _storage.dailyResultFor(day) ?? _storage.dailyResultFor(_today);
+    if (result == null) return;
+    final text = dailyShareText(
+      day: result.day,
+      size: dailySize(result.day),
+      seconds: result.seconds,
+      stars: result.stars,
+      streak: streakOn(_storage.daily.streak, result.day).current,
+      link: widget.platform.shareLink,
+    );
+    var ok = false;
+    try {
+      ok = await widget.copier.copyText(text);
+    } catch (_) {
+      ok = false;
+    }
+    if (mounted) _showToast(ok ? 'Copied!' : 'Could not copy');
+  }
+
+  /// Short message drawn above every overlay.
+  void _showToast(String text) {
+    _toastTimer?.cancel();
+    setState(() => _toast = text);
+    _toastTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (mounted) setState(() => _toast = null);
+    });
+  }
+
+  /// Next button / Enter after a win.
+  void _advance() {
+    if (_dailyDay != null) {
+      _backToLevels();
+    } else {
+      _goTo(_level + 1);
+    }
   }
 
   void _goTo(int level) {
@@ -604,7 +746,9 @@ class _GameScreenState extends State<GameScreen>
       _mistakeMade = false;
       _fx.clear();
     });
-    if (_storage.progress?.level == _level) {
+    if (_dailyDay != null) {
+      unawaited(_storage.clearDailyProgress());
+    } else if (_storage.progress?.level == _level) {
       unawaited(_storage.clearProgress());
     }
     _syncGameplay();
@@ -683,8 +827,19 @@ class _GameScreenState extends State<GameScreen>
       _clock.stop();
       final seconds = _elapsed;
       final generation = _boardGeneration;
-      unawaited(_storage.clearProgress());
-      _storage.recordClear(_level, seconds, mistakes: _mistakeMade).then((r) {
+      final day = _dailyDay;
+      final Future<ClearResult> record;
+      if (day != null) {
+        record = _storage.recordDailyClear(
+          day,
+          seconds,
+          mistakes: _mistakeMade,
+        );
+      } else {
+        unawaited(_storage.clearProgress());
+        record = _storage.recordClear(_level, seconds, mistakes: _mistakeMade);
+      }
+      record.then((r) {
         if (!mounted || generation != _boardGeneration) return;
         setState(() => _result = r);
         _maybeOpenSummary();
@@ -765,7 +920,9 @@ class _GameScreenState extends State<GameScreen>
     } else if (key == LogicalKeyboardKey.keyR) {
       _restart();
     } else if (key == LogicalKeyboardKey.enter && _game.isWon) {
-      _goTo(_level + 1);
+      _advance();
+    } else if (key == LogicalKeyboardKey.keyD) {
+      _openDaily();
     } else {
       return KeyEventResult.ignored;
     }
@@ -781,9 +938,29 @@ class _GameScreenState extends State<GameScreen>
     }
     switch (_panel) {
       case _Panel.summary:
-        if (enter || k == LogicalKeyboardKey.space) _goTo(_level + 1);
+        if (enter || k == LogicalKeyboardKey.space) {
+          _advance();
+        } else if (k == LogicalKeyboardKey.keyC && _result?.daily != null) {
+          _copyDaily();
+        }
       case _Panel.album:
-        if (enter) _closePanel();
+        if (enter) {
+          final goal = _storage.setGoal;
+          if (goal != null) {
+            _openLevelFromOverlay(goal.level);
+          } else {
+            _closePanel();
+          }
+        }
+      case _Panel.daily:
+        if (enter || k == LogicalKeyboardKey.space) {
+          _playDaily();
+        } else if (k == LogicalKeyboardKey.keyC &&
+            _storage.dailyResultFor(_today) != null) {
+          _copyDaily();
+        } else if (k == LogicalKeyboardKey.keyL && _dailyDay != null) {
+          _backToLevels();
+        }
       case _Panel.levels:
         var sel = _mapSel;
         if (k == LogicalKeyboardKey.arrowRight) sel++;
@@ -822,7 +999,9 @@ class _GameScreenState extends State<GameScreen>
 
   // ---- Build ------------------------------------------------------------
 
-  String get _levelTitle => _game.puzzle.name ?? 'Level $_level';
+  String get _levelTitle => _dailyDay != null
+      ? 'Daily ${dayLabel(_dailyDay!)}'
+      : _game.puzzle.name ?? 'Level $_level';
 
   @override
   Widget build(BuildContext context) {
@@ -886,12 +1065,13 @@ class _GameScreenState extends State<GameScreen>
       if (_panel == _Panel.summary && result != null)
         Positioned.fill(
           child: SummaryOverlay(
-            key: ValueKey('summary-$_level'),
+            key: ValueKey('summary-${_dailyDay ?? 'level'}-$_level'),
             palette: p,
             result: result,
             puzzle: _game.puzzle,
             title: _levelTitle,
-            onNext: () => _goTo(_level + 1),
+            onNext: _advance,
+            onCopy: result.daily != null ? _copyDaily : null,
             onReplay: () {
               _closePanel();
               _restart();
@@ -908,6 +1088,11 @@ class _GameScreenState extends State<GameScreen>
         Positioned.fill(
           child: AlbumOverlay(
             palette: p,
+            sets: _storage.albumSets,
+            goal: _storage.setGoal,
+            unlocked: _storage.unlocked,
+            dailyTotal: _storage.daily.streak.total,
+            dailyBest: _storage.daily.streak.best,
             solved: _storage.solvedLevels,
             starsOf: _storage.stars,
             puzzleOf: _storage.previewPuzzle,
@@ -949,6 +1134,18 @@ class _GameScreenState extends State<GameScreen>
             onClose: _closePanel,
           ),
         ),
+      if (_panel == _Panel.daily)
+        Positioned.fill(
+          child: DailyOverlay(
+            palette: p,
+            info: _dailyInfo(),
+            playing: _dailyDay != null && _dailyDay == _today,
+            onPlay: _playDaily,
+            onBack: _backToLevels,
+            onCopy: _copyDaily,
+            onClose: _closePanel,
+          ),
+        ),
       if (_tutorialOpen)
         Positioned.fill(
           child: HowToPlayOverlay(
@@ -957,6 +1154,32 @@ class _GameScreenState extends State<GameScreen>
             step: _tutorialStep,
             onNext: _tutorialNext,
             onSkip: _closeTutorial,
+          ),
+        ),
+      if (_toast != null)
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 24,
+          child: IgnorePointer(
+            child: Center(
+              child: PaperPanel(
+                key: const Key('toast'),
+                palette: p,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Text(
+                  _toast!,
+                  style: TextStyle(
+                    color: p.panelText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
     ];
@@ -969,7 +1192,7 @@ class _GameScreenState extends State<GameScreen>
     showCursor: _showCursor,
     reveal: _reveal,
     palette: p,
-    picture: PicturePalette.forLevel(_level),
+    picture: PicturePalette.forLevel(_game.puzzle.level),
     mistakes: _mistakes,
     fx: _fx,
     onStrokeStart: _onStrokeStart,
@@ -1001,7 +1224,61 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
+  /// Header of the daily board: back to levels, date and size.
+  Widget _dailyNav(PaperPalette p, {required bool big}) {
+    final day = _dailyDay!;
+    final stars = _storage.dailyResultFor(day)?.stars ?? 0;
+    return Row(
+      children: [
+        IconButton(
+          key: const Key('daily-nav-back'),
+          tooltip: 'Back to levels',
+          color: p.panelText,
+          visualDensity: VisualDensity.compact,
+          onPressed: _backToLevels,
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Daily',
+                  key: const Key('daily-title'),
+                  style: TextStyle(
+                    color: p.panelText,
+                    fontSize: big ? 20 : 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${dayLabel(day)}  ${_game.size}x${_game.size}',
+                      style: TextStyle(color: p.panelSubtle, fontSize: 12),
+                    ),
+                    const SizedBox(width: 6),
+                    StarRow(count: stars, palette: p, size: 13),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
   Widget _levelNav(PaperPalette p, {required bool big}) {
+    if (_dailyDay != null) return _dailyNav(p, big: big);
     final best = _storage.stars(_level);
     return Row(
       children: [
@@ -1061,7 +1338,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _timeBlock(PaperPalette p, {required bool big}) {
-    final best = _storage.bestSeconds(_level);
+    final best = _dailyDay != null ? null : _storage.bestSeconds(_level);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: big
@@ -1078,7 +1355,11 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
         Text(
-          best == null ? 'Best --' : 'Best ${formatTime(best)}',
+          _dailyDay != null
+              ? 'Daily'
+              : best == null
+              ? 'Best --'
+              : 'Best ${formatTime(best)}',
           style: TextStyle(color: p.panelSubtle, fontSize: 12),
         ),
       ],
@@ -1211,6 +1492,14 @@ class _GameScreenState extends State<GameScreen>
     ),
   ];
 
+  Widget _dailyCard(PaperPalette p, {required bool compact}) => DailyCard(
+    palette: p,
+    info: _dailyInfo(),
+    compact: compact,
+    playing: _dailyDay != null,
+    onTap: _openDaily,
+  );
+
   Widget _infoPanel(PaperPalette p) => PaperPanel(
     palette: p,
     tape: true,
@@ -1234,7 +1523,10 @@ class _GameScreenState extends State<GameScreen>
                 ),
               const SizedBox(height: 12),
               _timeBlock(p, big: true),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              // Kept high so short landscape screens show it unscrolled.
+              _dailyCard(p, compact: c.maxHeight < 520),
+              const SizedBox(height: 12),
               _goals(p),
               const SizedBox(height: 14),
               _xpBlock(p),
@@ -1355,7 +1647,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _winBox(PaperPalette p, {required bool vertical}) {
-    final best = _storage.bestSeconds(_level);
+    final best = _dailyDay != null ? null : _storage.bestSeconds(_level);
     final text = Text(
       '$_levelTitle! Solved in ${formatTime(_elapsed)}'
       '${best != null ? '  Best ${formatTime(best)}' : ''}',
@@ -1369,12 +1661,15 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
     final next = PaperButton(
+      key: const Key('win-next'),
       palette: p,
-      label: 'Next',
-      icon: Icons.arrow_forward_rounded,
+      label: _dailyDay != null ? 'Levels' : 'Next',
+      icon: _dailyDay != null
+          ? Icons.map_outlined
+          : Icons.arrow_forward_rounded,
       primary: true,
       expand: vertical,
-      onPressed: () => _goTo(_level + 1),
+      onPressed: _advance,
     );
     if (vertical) {
       return Column(
@@ -1395,10 +1690,14 @@ class _GameScreenState extends State<GameScreen>
   }
 
   String _hint(bool wide) {
-    if (_game.isWon) return 'Press Next or Enter for the next puzzle';
+    if (_game.isWon) {
+      return _dailyDay != null
+          ? 'Press Enter to go back to the levels'
+          : 'Press Next or Enter for the next puzzle';
+    }
     return wide
         ? 'Drag to paint. Right-click: X. Keys: arrows, Space, X, U undo, '
-              'R restart'
+              'R restart, D daily'
         : 'Tap or drag to paint  -  Switch to X to mark empty cells';
   }
 
@@ -1507,6 +1806,11 @@ class _GameScreenState extends State<GameScreen>
               ],
             ]..removeLast(),
           ),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: _dailyCard(p, compact: true),
         ),
         Expanded(
           child: Padding(

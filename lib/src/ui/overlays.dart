@@ -6,6 +6,7 @@ import '../art/paper_palette.dart';
 import '../art/picture_thumb.dart';
 import '../art/shapes.dart';
 import '../logic/puzzle.dart';
+import '../meta/collection.dart';
 import '../meta/progress_rules.dart';
 import 'paper_ui.dart';
 
@@ -108,10 +109,14 @@ class SummaryOverlay extends StatefulWidget {
     this.puzzle,
     this.onStar,
     this.onFinished,
+    this.onCopy,
   });
 
   final PaperPalette palette;
   final ClearResult result;
+
+  /// Copies the daily result text; only used for daily solves.
+  final VoidCallback? onCopy;
   final Puzzle? puzzle;
   final String title;
   final VoidCallback onNext;
@@ -158,168 +163,280 @@ class _SummaryOverlayState extends State<SummaryOverlay>
     super.dispose();
   }
 
+  /// The pinned next-goal line under the scrolling content.
+  String? _goalText(ClearResult r) {
+    final daily = r.daily;
+    if (daily != null) {
+      return daily.rewarded
+          ? 'Come back tomorrow for streak ${daily.streak + 1}'
+          : 'Come back tomorrow for a new daily';
+    }
+    final goal = r.setGoal;
+    if (goal == null) return null;
+    return 'Next: Level ${goal.level} - ${goal.missing} more to complete '
+        '${goal.set.name} (+$kSetBonusXp XP)';
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.palette;
     final r = widget.result;
+    final daily = r.daily;
     final sub = TextStyle(color: p.panelSubtle, fontSize: 13);
     final strong = TextStyle(
       color: p.panelText,
       fontSize: 16,
       fontWeight: FontWeight.w800,
     );
+    final goal = _goalText(r);
+    final buttons = Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (daily == null)
+          PaperButton(
+            palette: p,
+            label: 'Replay',
+            icon: Icons.replay_rounded,
+            compact: true,
+            onPressed: widget.onReplay,
+          ),
+        if (daily != null && widget.onCopy != null)
+          PaperButton(
+            key: const Key('summary-copy'),
+            palette: p,
+            label: 'Copy result',
+            icon: Icons.copy_rounded,
+            compact: true,
+            onPressed: widget.onCopy,
+          ),
+        PaperButton(
+          palette: p,
+          label: 'Album',
+          icon: Icons.photo_library_outlined,
+          compact: true,
+          onPressed: widget.onAlbum,
+        ),
+        PaperButton(
+          key: const Key('summary-next'),
+          palette: p,
+          label: daily == null ? 'Next' : 'Levels',
+          icon: daily == null
+              ? Icons.arrow_forward_rounded
+              : Icons.map_outlined,
+          primary: true,
+          onPressed: widget.onNext,
+        ),
+      ],
+    );
     return OverlayFrame(
       palette: p,
       maxWidth: 420,
       cardKey: const Key('level-summary'),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-        child: AnimatedBuilder(
-          animation: _c,
-          builder: (context, _) {
-            final t = Curves.easeOut.transform(_c.value);
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Puzzle solved!',
-                  style: TextStyle(
-                    color: p.accent,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                child: AnimatedBuilder(
+                  animation: _c,
+                  builder: (context, _) => _content(p, r, sub, strong),
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 84,
-                      height: 84,
-                      child: PictureThumb(
-                        level: r.level,
-                        puzzle: widget.puzzle,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${widget.title}! Solved in ${formatTime(r.seconds)}',
-                            style: strong,
-                            maxLines: 2,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            r.newBest
-                                ? 'New best!'
-                                : 'Best ${formatTime(r.bestSeconds)}',
-                            key: const Key('summary-best'),
-                            style: r.newBest
-                                ? TextStyle(
-                                    color: p.accent,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                  )
-                                : sub,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              ),
+            ),
+            if (goal != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                goal,
+                key: const Key('summary-goal'),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: p.accent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 14),
-                _StampedStars(palette: p, stars: r.stars, t: _c.value),
-                const SizedBox(height: 8),
-                _StarReasons(palette: p, result: r),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text('+${(r.xpGained * t).round()} XP', style: strong),
-                    const Spacer(),
-                    if (r.leveledUp)
-                      Text(
-                        'Level up!',
-                        style: TextStyle(
-                          color: p.accent,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                XpBar(
-                  level: t < 1 && r.leveledUp ? r.before : r.after,
-                  palette: p,
-                  fraction: r.leveledUp
-                      ? (t < 1
-                            ? r.before.fraction + (1 - r.before.fraction) * t
-                            : null)
-                      : r.before.fraction +
-                            (r.after.fraction - r.before.fraction) * t,
-                ),
-                for (final theme in r.unlockedThemes) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 44,
-                        height: 32,
-                        child: ThemeSwatch(theme: theme),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'New theme unlocked: ${theme.label}',
-                          style: strong.copyWith(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 16),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    PaperButton(
-                      palette: p,
-                      label: 'Replay',
-                      icon: Icons.replay_rounded,
-                      compact: true,
-                      onPressed: widget.onReplay,
-                    ),
-                    PaperButton(
-                      palette: p,
-                      label: 'Album',
-                      icon: Icons.photo_library_outlined,
-                      compact: true,
-                      onPressed: widget.onAlbum,
-                    ),
-                    PaperButton(
-                      key: const Key('summary-next'),
-                      palette: p,
-                      label: 'Next',
-                      icon: Icons.arrow_forward_rounded,
-                      primary: true,
-                      onPressed: widget.onNext,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Enter: next puzzle  -  Esc: look at the picture',
-                  style: sub,
-                ),
-              ],
-            );
-          },
+              ),
+            ],
+            const SizedBox(height: 10),
+            buttons,
+            const SizedBox(height: 6),
+            Text(
+              daily == null
+                  ? 'Enter: next puzzle  -  Esc: look at the picture'
+                  : 'Enter: levels  -  C: copy  -  Esc: look at the picture',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: sub,
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _content(
+    PaperPalette p,
+    ClearResult r,
+    TextStyle sub,
+    TextStyle strong,
+  ) {
+    final t = Curves.easeOut.transform(_c.value);
+    final daily = r.daily;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          daily == null ? 'Puzzle solved!' : 'Daily solved!',
+          style: TextStyle(
+            color: p.accent,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            SizedBox(
+              width: 84,
+              height: 84,
+              child: PictureThumb(level: r.level, puzzle: widget.puzzle),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${widget.title}! Solved in ${formatTime(r.seconds)}',
+                    style: strong,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 4),
+                  if (daily != null)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.local_fire_department_rounded,
+                          size: 18,
+                          color: Color(0xFFF07A2B),
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            daily.rewarded
+                                ? 'Streak ${daily.streak}  -  Best ${daily.best}'
+                                : 'No reward: this daily was already counted',
+                            key: const Key('summary-streak'),
+                            maxLines: 2,
+                            style: TextStyle(
+                              color: daily.rewarded ? p.accent : p.panelSubtle,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      r.newBest
+                          ? 'New best!'
+                          : 'Best ${formatTime(r.bestSeconds)}',
+                      key: const Key('summary-best'),
+                      style: r.newBest
+                          ? TextStyle(
+                              color: p.accent,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            )
+                          : sub,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _StampedStars(palette: p, stars: r.stars, t: _c.value),
+        const SizedBox(height: 8),
+        _StarReasons(palette: p, result: r),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Text('+${(r.xpGained * t).round()} XP', style: strong),
+            const Spacer(),
+            if (r.leveledUp)
+              Text(
+                'Level up!',
+                style: TextStyle(
+                  color: p.accent,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        XpBar(
+          level: t < 1 && r.leveledUp ? r.before : r.after,
+          palette: p,
+          fraction: r.leveledUp
+              ? (t < 1 ? r.before.fraction + (1 - r.before.fraction) * t : null)
+              : r.before.fraction + (r.after.fraction - r.before.fraction) * t,
+        ),
+        for (final bonus in r.bonuses) ...[
+          const SizedBox(height: 8),
+          Row(
+            key: Key('summary-bonus-${bonus.label}'),
+            children: [
+              if (bonus.label.startsWith('Set complete'))
+                const CompletionSeal(size: 22)
+              else
+                const Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 20,
+                  color: Color(0xFFF07A2B),
+                ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${bonus.label}  +${bonus.xp} XP',
+                  style: strong.copyWith(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (daily != null && daily.graceUsed) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Your grace saved the streak. It refills after '
+            '${daily.refillLeft} more daily solves.',
+            style: sub,
+          ),
+        ],
+        for (final theme in r.unlockedThemes) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              SizedBox(width: 44, height: 32, child: ThemeSwatch(theme: theme)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'New theme unlocked: ${theme.label}',
+                  style: strong.copyWith(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
@@ -384,7 +501,7 @@ class _StarReasons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final par = parSeconds(sizeForLevel(result.level));
+    final par = parSeconds(result.size ?? sizeForLevel(result.level));
     final noMistakes = !result.mistakes;
     final inPar = result.seconds <= par;
     Widget item(bool ok, String text) => Row(
@@ -424,6 +541,11 @@ class AlbumOverlay extends StatelessWidget {
     this.puzzleOf,
     required this.onOpen,
     required this.onClose,
+    this.sets = const [],
+    this.goal,
+    this.unlocked = 1,
+    this.dailyTotal = 0,
+    this.dailyBest = 0,
   });
 
   final PaperPalette palette;
@@ -433,10 +555,22 @@ class AlbumOverlay extends StatelessWidget {
   final void Function(int level) onOpen;
   final VoidCallback onClose;
 
+  /// Album sets to show, Set 1 first.
+  final List<SetProgress> sets;
+
+  /// Next picture that moves a set toward completion (Enter plays it).
+  final SetGoal? goal;
+  final int unlocked;
+  final int dailyTotal;
+  final int dailyBest;
+
   @override
   Widget build(BuildContext context) {
     final p = palette;
     final h = MediaQuery.sizeOf(context).height;
+    final sub = TextStyle(color: p.panelSubtle, fontSize: 13);
+    final complete = sets.where((s) => s.complete).length;
+    final g = goal;
     return OverlayFrame(
       palette: p,
       maxWidth: 640,
@@ -452,65 +586,266 @@ class AlbumOverlay extends StatelessWidget {
               solved.isEmpty
                   ? 'Solve a puzzle to start your album.'
                   : '${solved.length} ${solved.length == 1 ? 'picture' : 'pictures'} collected',
-              style: TextStyle(color: p.panelSubtle, fontSize: 13),
+              style: sub,
             ),
-            const SizedBox(height: 10),
-            if (solved.isNotEmpty)
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: math.max(120, h - 190)),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.only(right: 10, bottom: 4),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 104,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 0.78,
+            Text(
+              'Sets complete: $complete  -  Daily solved: $dailyTotal  -  '
+              'Best streak: $dailyBest',
+              key: const Key('album-stats'),
+              maxLines: 2,
+              style: sub.copyWith(fontSize: 12),
+            ),
+            if (g != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: p.accent.withValues(alpha: 0.6)),
                   ),
-                  itemCount: solved.length,
-                  itemBuilder: (context, i) {
-                    final level = solved[i];
-                    final name =
-                        (puzzleOf?.call(level) ?? cachedPuzzle(level)).name;
-                    return GestureDetector(
-                      onTap: () => onOpen(level),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: p.panelBorder.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              child: PictureThumb(
-                                level: level,
-                                puzzle: puzzleOf?.call(level),
-                              ),
-                            ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Next: Level ${g.level} - ${g.missing} more to '
+                          'complete ${g.set.name} (+$kSetBonusXp XP)',
+                          key: const Key('album-goal-text'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: p.panelText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            name ?? '#$level',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: p.panelText,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          StarRow(count: starsOf(level), palette: p, size: 12),
-                        ],
+                        ),
                       ),
-                    );
-                  },
+                      const SizedBox(width: 6),
+                      PaperButton(
+                        key: const Key('album-goal'),
+                        palette: p,
+                        label: 'Play',
+                        icon: Icons.play_arrow_rounded,
+                        primary: true,
+                        compact: true,
+                        onPressed: () => onOpen(g.level),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+            ],
+            const SizedBox(height: 8),
+            if (sets.isNotEmpty)
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: math.max(110, h - 250),
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(right: 10, bottom: 4),
+                    itemCount: sets.length,
+                    itemBuilder: (context, i) => _SetSection(
+                      palette: p,
+                      set: sets[i],
+                      unlocked: unlocked,
+                      starsOf: starsOf,
+                      puzzleOf: puzzleOf,
+                      onOpen: onOpen,
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 10),
+              child: Text(
+                g == null
+                    ? 'Esc: close'
+                    : 'Enter: play Level ${g.level}  -  Esc: close',
+                style: sub.copyWith(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SetSection extends StatelessWidget {
+  const _SetSection({
+    required this.palette,
+    required this.set,
+    required this.unlocked,
+    required this.starsOf,
+    required this.puzzleOf,
+    required this.onOpen,
+  });
+
+  final PaperPalette palette;
+  final SetProgress set;
+  final int unlocked;
+  final int Function(int level) starsOf;
+  final Puzzle Function(int level)? puzzleOf;
+  final void Function(int level) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palette;
+    return Padding(
+      key: Key('album-set-${set.index}'),
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (set.complete) ...[
+                const CompletionSeal(size: 20),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                child: Text(
+                  'Set ${set.index + 1}: ${set.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.panelText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              Text(
+                set.complete ? 'Complete' : '${set.solved}/${set.total}',
+                key: Key('album-set-count-${set.index}'),
+                style: TextStyle(
+                  color: set.complete ? const Color(0xFF2E9E5B) : p.panelSubtle,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 7,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(color: p.panelBorder.withValues(alpha: 0.15)),
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: set.fraction.clamp(0.0, 1.0),
+                    child: ColoredBox(
+                      color: set.complete ? const Color(0xFFE8A317) : p.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (var l = set.firstLevel; l <= set.lastLevel; l++)
+                _AlbumTile(
+                  palette: p,
+                  level: l,
+                  stars: starsOf(l),
+                  locked: l > unlocked,
+                  puzzle: starsOf(l) > 0 ? puzzleOf?.call(l) : null,
+                  onOpen: onOpen,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlbumTile extends StatelessWidget {
+  const _AlbumTile({
+    required this.palette,
+    required this.level,
+    required this.stars,
+    required this.locked,
+    required this.puzzle,
+    required this.onOpen,
+  });
+
+  final PaperPalette palette;
+  final int level;
+  final int stars;
+  final bool locked;
+  final Puzzle? puzzle;
+  final void Function(int level) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = palette;
+    final solved = stars > 0;
+    final name = solved ? (puzzle ?? cachedPuzzle(level)).name : null;
+    return GestureDetector(
+      key: Key('album-tile-$level'),
+      onTap: locked ? null : () => onOpen(level),
+      child: SizedBox(
+        width: 52,
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: solved
+                    ? Colors.white.withValues(alpha: 0.6)
+                    : p.panelBorder.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: p.panelBorder.withValues(alpha: solved ? 0.5 : 0.3),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: solved
+                  ? PictureThumb(level: level, puzzle: puzzle)
+                  : locked
+                  ? CustomPaint(
+                      size: const Size.square(20),
+                      painter: _LockPainter(p.panelSubtle),
+                    )
+                  : Text(
+                      '?',
+                      style: TextStyle(
+                        color: p.panelSubtle,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              name ?? '#$level',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: solved ? p.panelText : p.panelSubtle,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (solved)
+              StarRow(count: stars, palette: p, size: 10)
+            else
+              const SizedBox(height: 10),
           ],
         ),
       ),

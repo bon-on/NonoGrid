@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../art/paper_palette.dart';
@@ -380,4 +382,51 @@ class _SwatchPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SwatchPainter old) => old.p != p;
+}
+
+/// Gold "complete" seal for finished album sets, drawn in code.
+class CompletionSeal extends StatelessWidget {
+  const CompletionSeal({super.key, this.size = 22});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(size: Size.square(size), painter: _SealPainter());
+}
+
+class _SealPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.shortestSide / 2;
+    final path = Path();
+    const points = 12;
+    for (var i = 0; i < points * 2; i++) {
+      final a = i * math.pi / points - math.pi / 2;
+      final rr = i.isEven ? r : r * 0.82;
+      final o = c + Offset(math.cos(a) * rr, math.sin(a) * rr);
+      if (i == 0) {
+        path.moveTo(o.dx, o.dy);
+      } else {
+        path.lineTo(o.dx, o.dy);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = const Color(0xFFE8A317));
+    canvas.drawCircle(
+      c,
+      r * 0.62,
+      Paint()
+        ..color = const Color(0xFFFFD45C)
+        ..style = PaintingStyle.fill,
+    );
+    Shapes.paintCheck(
+      canvas,
+      Rect.fromCircle(center: c, radius: r * 0.42),
+      const Color(0xFF8A5A00),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SealPainter old) => false;
 }
