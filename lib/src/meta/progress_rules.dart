@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'collection.dart';
+
 /// Cosmetic paper/ink themes, unlocked by painter level. Themes never change
 /// any rule.
 enum NonoTheme {
@@ -89,6 +91,11 @@ class ClearResult {
     required this.before,
     required this.after,
     required this.unlockedThemes,
+    this.size,
+    this.bonuses = const [],
+    this.completedSets = const [],
+    this.setGoal,
+    this.daily,
   });
 
   final int level;
@@ -105,5 +112,52 @@ class ClearResult {
   final PainterLevel after;
   final List<NonoTheme> unlockedThemes;
 
+  /// Grid size of the solved puzzle (null: derived from [level]).
+  final int? size;
+
+  /// Extra XP included in [xpGained] (daily bonus, set completion).
+  final List<XpBonus> bonuses;
+
+  /// Album sets completed (and rewarded) by this clear.
+  final List<SetProgress> completedSets;
+
+  /// Next picture that moves an album set toward completion.
+  final SetGoal? setGoal;
+
+  /// Present for a daily puzzle solve.
+  final DailyOutcome? daily;
+
   bool get leveledUp => after.level > before.level;
+}
+
+/// One labelled XP bonus shown on the summary.
+class XpBonus {
+  const XpBonus(this.label, this.xp);
+  final String label;
+  final int xp;
+}
+
+/// Daily-specific part of a [ClearResult].
+class DailyOutcome {
+  const DailyOutcome({
+    required this.day,
+    required this.streak,
+    required this.best,
+    required this.rewarded,
+    required this.graceUsed,
+    required this.graceReady,
+    required this.refillLeft,
+  });
+
+  final int day;
+
+  /// Streak after this solve.
+  final int streak;
+  final int best;
+
+  /// False when the solve earned nothing (already solved, clock moved back).
+  final bool rewarded;
+  final bool graceUsed;
+  final bool graceReady;
+  final int refillLeft;
 }

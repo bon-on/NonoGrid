@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nono_grid/src/meta/daily.dart';
 import 'package:nono_grid/src/platform/crazygames_prefs_store.dart';
+import 'package:nono_grid/src/storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 import 'package:shared_preferences_platform_interface/types.dart';
@@ -321,5 +323,53 @@ void main() {
 
   test('a failing data module surfaces so the caller keeps local', () {
     expect(() => _load(cloud: _FakeData()..failReads = true), throwsStateError);
+  });
+
+  test('daily streak and set rewards sync through the account copy', () async {
+    final previous = SharedPreferencesStorePlatform.instance;
+    addTearDown(() {
+      SharedPreferencesStorePlatform.instance = previous;
+      SharedPreferences.resetStatic();
+    });
+    final cloud = _FakeData();
+    SharedPreferencesStorePlatform.instance = await _load(
+      cloud: cloud,
+      owner: 'ana',
+      local: <String, Object>{
+        'flutter.${GameStorage.progressKey}': jsonEncode(<String, Object>{
+          'version': 2,
+          'level': 10,
+          'maxCleared': 9,
+          'legacyThrough': 10,
+          'records': <String, Object>{
+            for (var l = 1; l <= 9; l++) '$l': <String, int>{'stars': 1},
+          },
+        }),
+      },
+    );
+    SharedPreferences.resetStatic();
+    final day = dayIndexOf(DateTime(2026, 11, 8));
+    final storage = await GameStorage.open(seedSource: () => 5);
+    await storage.recordDailyClear(day, 70);
+    await storage.recordClear(10, 40);
+
+    final values = cloud.envelope['values'] as Map<String, dynamic>;
+    final saved =
+        jsonDecode(values['flutter.${GameStorage.progressKey}'] as String)
+            as Map<String, dynamic>;
+    expect((saved['daily'] as Map)['streak'], 1);
+    expect(saved['setsAwarded'], <int>[0]);
+
+    // Another device starts from the account copy.
+    SharedPreferencesStorePlatform.instance = await _load(
+      cloud: cloud,
+      owner: 'ana',
+    );
+    SharedPreferences.resetStatic();
+    final other = await GameStorage.open(seedSource: () => 6);
+    expect(other.daily.streak.streak, 1);
+    expect(other.dailyResultFor(day)!.seconds, 70);
+    final replay = await other.recordClear(10, 30);
+    expect(replay.completedSets, isEmpty, reason: 'set paid once');
   });
 }

@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'logic/game.dart';
 import 'logic/puzzle.dart';
 import 'logic/rng.dart';
+import 'meta/collection.dart';
+import 'meta/daily.dart';
 import 'meta/progress_rules.dart';
 
 /// Saved in-progress board for one level.
@@ -45,6 +47,144 @@ class SavedProgress {
   }
 }
 
+int? _intIn(Object? v, {int min = 0, int max = 1 << 30}) =>
+    v is int && v >= min && v <= max ? v : null;
+
+/// Saved in-progress board of one day's daily puzzle.
+class DailyProgress {
+  const DailyProgress(
+    this.day,
+    this.cells,
+    this.elapsedSeconds, {
+    this.mistakes = false,
+  });
+  final int day;
+  final String cells;
+  final int elapsedSeconds;
+  final bool mistakes;
+
+  Map<String, Object> toJson() => {
+    'day': day,
+    'cells': cells,
+    'elapsed': elapsedSeconds,
+    'mistakes': mistakes,
+  };
+
+  static DailyProgress? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final day = _intIn(json['day']);
+    final cells = json['cells'];
+    if (day == null || cells is! String) return null;
+    return DailyProgress(
+      day,
+      cells,
+      _intIn(json['elapsed']) ?? 0,
+      mistakes: json['mistakes'] == true,
+    );
+  }
+}
+
+/// Result of the most recently solved daily.
+class DailyResult {
+  const DailyResult(this.day, this.seconds, this.stars);
+  final int day;
+  final int seconds;
+  final int stars;
+
+  Map<String, Object> toJson() => {
+    'day': day,
+    'seconds': seconds,
+    'stars': stars,
+  };
+
+  static DailyResult? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final day = _intIn(json['day']);
+    final seconds = _intIn(json['seconds']);
+    final stars = _intIn(json['stars'], min: 1, max: 3);
+    if (day == null || seconds == null || stars == null) return null;
+    return DailyResult(day, seconds, stars);
+  }
+}
+
+/// Everything about daily puzzles, stored under `daily` in the v2 JSON.
+class DailyData {
+  DailyData({
+    this.streak = const DailyStreak(),
+    List<int>? days,
+    this.result,
+    this.progress,
+  }) : days = days ?? <int>[];
+
+  /// Recent solved days kept for the calendar strip.
+  static const int keepDays = 30;
+
+  DailyStreak streak;
+  final List<int> days;
+  DailyResult? result;
+  DailyProgress? progress;
+
+  Map<String, Object?> toJson() => {
+    if (streak.lastDay != null) 'last': streak.lastDay,
+    'streak': streak.streak,
+    'best': streak.best,
+    'grace': streak.graceReady,
+    'refill': streak.refillLeft,
+    'total': streak.total,
+    'days': days,
+    if (result != null) 'result': result!.toJson(),
+    if (progress != null) 'progress': progress!.toJson(),
+  };
+
+  /// Field-by-field parse; anything damaged falls back to its default.
+  static DailyData parse(Object? json) {
+    if (json is! Map) return DailyData();
+    try {
+      final grace = json['grace'];
+      final graceReady = grace is bool ? grace : true;
+      final refill = _intIn(json['refill'], max: kGraceRefillSolves) ?? 0;
+      final streak = _intIn(json['streak']) ?? 0;
+      final best = _intIn(json['best']) ?? 0;
+      final days = <int>{};
+      final rawDays = json['days'];
+      if (rawDays is List) {
+        for (final d in rawDays) {
+          final v = _intIn(d);
+          if (v != null) days.add(v);
+        }
+      }
+      final sorted = days.toList()..sort();
+      return DailyData(
+        streak: DailyStreak(
+          lastDay: _intIn(json['last']),
+          streak: streak,
+          best: best < streak ? streak : best,
+          graceReady: graceReady || refill == 0,
+          refillLeft: graceReady || refill == 0 ? 0 : refill,
+          total: _intIn(json['total']) ?? 0,
+        ),
+        days: sorted.length > keepDays
+            ? sorted.sublist(sorted.length - keepDays)
+            : sorted,
+        result: DailyResult.fromJson(json['result']),
+        progress: DailyProgress.fromJson(json['progress']),
+      );
+    } catch (_) {
+      return DailyData();
+    }
+  }
+}
+
+Set<int> _parseSets(Object? json) {
+  final out = <int>{};
+  if (json is! List) return out;
+  for (final v in json) {
+    final i = _intIn(v, max: 1 << 26);
+    if (i != null) out.add(i);
+  }
+  return out;
+}
+
 /// Best result of one level.
 class LevelRecord {
   const LevelRecord({this.bestSeconds, this.stars = 0});
@@ -64,8 +204,12 @@ class NonoProgressData {
     this.progress,
     Map<int, int>? puzzleSeeds,
     this.legacyThrough = 0,
+    DailyData? daily,
+    Set<int>? setsAwarded,
   }) : records = records ?? <int, LevelRecord>{},
-       puzzleSeeds = puzzleSeeds ?? <int, int>{};
+       puzzleSeeds = puzzleSeeds ?? <int, int>{},
+       daily = daily ?? DailyData(),
+       setsAwarded = setsAwarded ?? <int>{};
 
   int level;
   int maxCleared;
@@ -75,6 +219,10 @@ class NonoProgressData {
   SavedProgress? progress;
   final Map<int, int> puzzleSeeds;
   final int legacyThrough;
+  final DailyData daily;
+
+  /// Album sets whose completion bonus was granted.
+  final Set<int> setsAwarded;
 
   Map<String, Object?> toJson() => {
     'version': 2,
@@ -92,6 +240,8 @@ class NonoProgressData {
         },
     },
     if (progress != null) 'progress': progress!.toJson(),
+    'daily': daily.toJson(),
+    'setsAwarded': setsAwarded.toList()..sort(),
   };
 
   /// Parses [raw]; returns null when it is missing or malformed so the
@@ -160,6 +310,8 @@ class NonoProgressData {
         progress: progress,
         puzzleSeeds: seeds,
         legacyThrough: legacyThrough,
+        daily: DailyData.parse(json['daily']),
+        setsAwarded: _parseSets(json['setsAwarded']),
       );
     } catch (_) {
       return null;
@@ -382,6 +534,20 @@ class GameStorage {
     return true;
   }
 
+  bool _isSolved(int level) => (_data.records[level]?.stars ?? 0) > 0;
+
+  /// Album sets from Set 1 through the one holding the newest open level.
+  List<SetProgress> get albumSets =>
+      visibleSets(unlocked, _isSolved, solvedLevels: _data.records.keys);
+
+  /// Next picture that moves an album set toward completion.
+  SetGoal? get setGoal => nextSetGoal(unlocked, _isSolved);
+
+  List<NonoTheme> _themesBetween(PainterLevel before, PainterLevel after) => [
+    for (final t in NonoTheme.values)
+      if (!t.unlockedAt(before.level) && t.unlockedAt(after.level)) t,
+  ];
+
   /// Records a clear of [level] in [seconds] and returns what changed.
   Future<ClearResult> recordClear(
     int level,
@@ -396,18 +562,33 @@ class GameStorage {
     final best = old?.bestSeconds;
     final newBest = best == null || seconds < best;
     final before = painterLevel;
-    final xpGained = clearXp(
+    var xpGained = clearXp(
       size: size,
       stars: stars,
       previousStars: previousStars,
     );
-    _data.xp += xpGained;
-    final after = painterLevel;
     if (level > _data.maxCleared) _data.maxCleared = level;
     _data.records[level] = LevelRecord(
       bestSeconds: newBest ? seconds : best,
       stars: stars > previousStars ? stars : previousStars,
     );
+    // Every complete set not rewarded yet pays out now, including sets
+    // completed before this feature existed.
+    final completed = <SetProgress>[];
+    final bonuses = <XpBonus>[];
+    for (final index in newlyCompleteSets(
+      _data.records.keys,
+      _isSolved,
+      _data.setsAwarded,
+    )) {
+      _data.setsAwarded.add(index);
+      final set = setProgress(index, _isSolved);
+      completed.add(set);
+      bonuses.add(XpBonus('Set complete: ${set.name}', kSetBonusXp));
+      xpGained += kSetBonusXp;
+    }
+    _data.xp += xpGained;
+    final after = painterLevel;
     if (_data.progress?.level == level) _data.progress = null;
     await _save();
     return ClearResult(
@@ -421,10 +602,111 @@ class GameStorage {
       xpGained: xpGained,
       before: before,
       after: after,
-      unlockedThemes: [
-        for (final t in NonoTheme.values)
-          if (!t.unlockedAt(before.level) && t.unlockedAt(after.level)) t,
-      ],
+      unlockedThemes: _themesBetween(before, after),
+      size: size,
+      bonuses: bonuses,
+      completedSets: completed,
+      setGoal: setGoal,
+    );
+  }
+
+  // ---- Daily puzzle ------------------------------------------------------
+
+  final Map<int, Puzzle> _dailyPuzzles = {};
+
+  DailyData get daily => _data.daily;
+
+  /// The daily puzzle of [day] (cached; never saved).
+  Puzzle dailyPuzzleFor(int day) {
+    if (_dailyPuzzles.length > 8) _dailyPuzzles.clear();
+    return _dailyPuzzles.putIfAbsent(day, () => dailyPuzzle(day));
+  }
+
+  /// Saved daily board of [day], if any.
+  DailyProgress? dailyProgressFor(int day) {
+    final p = _data.daily.progress;
+    return p != null && p.day == day ? p : null;
+  }
+
+  /// Result of [day]'s daily when it was solved.
+  DailyResult? dailyResultFor(int day) {
+    final r = _data.daily.result;
+    return r != null && r.day == day ? r : null;
+  }
+
+  Future<void> saveDailyProgress(DailyProgress p) {
+    _data.daily.progress = p;
+    return _save();
+  }
+
+  Future<void> clearDailyProgress() {
+    if (_data.daily.progress == null) return _pendingWrite;
+    _data.daily.progress = null;
+    return _save();
+  }
+
+  /// Records a solve of [day]'s daily. The first solve of a day later than
+  /// the last solved one earns stars, first-clear XP and the daily bonus;
+  /// anything else (replay, clock moved back) earns nothing.
+  Future<ClearResult> recordDailyClear(
+    int day,
+    int seconds, {
+    bool mistakes = false,
+  }) async {
+    final size = dailySize(day);
+    final stars = starsFor(size: size, seconds: seconds, mistakes: mistakes);
+    final before = painterLevel;
+    final daily = _data.daily;
+    final solve = applySolve(daily.streak, day);
+    var xp = 0;
+    final bonuses = <XpBonus>[];
+    if (solve.rewarded) {
+      daily.streak = solve.state;
+      xp = clearXp(size: size, stars: stars, previousStars: 0);
+      final bonus = dailyBonusXp(solve.state.streak);
+      bonuses.add(XpBonus('Daily bonus (streak ${solve.state.streak})', bonus));
+      xp += bonus;
+      _data.xp += xp;
+      if (!daily.days.contains(day)) {
+        daily.days
+          ..add(day)
+          ..sort();
+        if (daily.days.length > DailyData.keepDays) {
+          daily.days.removeRange(0, daily.days.length - DailyData.keepDays);
+        }
+      }
+    }
+    final previous = dailyResultFor(day);
+    if (previous == null) daily.result = DailyResult(day, seconds, stars);
+    if (daily.progress?.day == day) daily.progress = null;
+    final after = painterLevel;
+    await _save();
+    final state = daily.streak;
+    return ClearResult(
+      level: 0,
+      seconds: seconds,
+      bestSeconds: previous == null || seconds < previous.seconds
+          ? seconds
+          : previous.seconds,
+      newBest: false,
+      stars: stars,
+      mistakes: mistakes,
+      previousStars: 0,
+      xpGained: xp,
+      before: before,
+      after: after,
+      unlockedThemes: _themesBetween(before, after),
+      size: size,
+      bonuses: bonuses,
+      daily: DailyOutcome(
+        day: day,
+        streak: streakOn(state, day).current,
+        best: state.best,
+        rewarded: solve.rewarded,
+        graceUsed: solve.graceUsed,
+        graceReady: state.graceReady,
+        refillLeft: state.refillLeft,
+      ),
     );
   }
 
