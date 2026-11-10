@@ -68,3 +68,9 @@ Out of scope: GamePix SDK integration, ads, gameplay changes, portal submission.
 - tool/build_crazygames.sh
 - node <harness-lab>/dist/index.js audit . --format md
 - reports/nono-grid-gamepix-verification.md
+
+## Update 2026-11-11 (feature-portal-quality-pass)
+
+The GamePix bundle is built with `--wasm` (JavaScript fallback kept). The
+`crazygames` / `bon-on.github.io` string checks cover `main.dart.js`,
+`main.dart.wasm` and `main.dart.mjs`.

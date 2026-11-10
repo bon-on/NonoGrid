@@ -15,11 +15,14 @@ Output:
 - `build/gamepix/`: bundle folder
 - `build/nono-grid-gamepix.zip`: zip to upload (files at the zip root, `index.html` first level)
 
-The script runs `flutter build web --release --base-href / --no-web-resources-cdn
---dart-define=GAMEPIX=true`, switches `<base href>` to `./`, removes `*.symbols` and
-checks: relative base, no `crazygames-sdk`, no `bon-on.github.io`, no external
+The script runs `flutter build web --release --wasm --base-href / --no-web-resources-cdn
+--dart-define=GAMEPIX=true` (WebAssembly on Chromium browsers, JavaScript elsewhere and as a fallback; see
+`adr-web-wasm-portal-build`), switches `<base href>` to `./`, removes `*.symbols` and the
+unused `wimp.*` renderer and checks: both builds and the JavaScript retry present, subset
+fonts, relative base, no `crazygames-sdk`, no `bon-on.github.io`, no external
 `src`/`href` in `index.html`, viewport `user-scalable=no`, Roboto in
-`FontManifest.json`, and `index.html` at the zip root. It prints file count and size.
+`FontManifest.json`, no `crazygames` / `bon-on.github.io` in `main.dart.js`,
+`main.dart.wasm` or `main.dart.mjs`, and `index.html` at the zip root. It prints file count and size.
 
 ## Upload notes
 

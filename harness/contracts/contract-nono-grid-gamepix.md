@@ -5,6 +5,7 @@ status: active
 related_specs:
   - feature-daily-puzzle
   - feature-nono-grid-gamepix
+  - feature-portal-quality-pass
 evidence_files:
   - docs/gamepix.md
   - reports/nono-grid-gamepix-verification.md

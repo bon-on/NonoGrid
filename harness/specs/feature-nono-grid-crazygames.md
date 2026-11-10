@@ -83,3 +83,10 @@ Out of scope: ads, gameplay changes, portal submission. (Data/User modules were 
 
 The screen observes app lifecycle so hidden or inactive tabs pause play and sound, then resume only an active run. Widget regression checks cover background/resume and overlays.
 Short landscape tool panels use compact controls and spacing so the Logic hint action does not push sound/help below the viewport. Existing 844x390 layout regression must pass.
+
+## Update 2026-11-11 (feature-portal-quality-pass)
+
+First launch shows a non-blocking tip strip instead of the card, so
+`gameplayStart` is sent right after launch; the "?" card still stops and
+restarts gameplay. Portal builds now use `--wasm` with a JavaScript fallback
+(`adr-web-wasm-portal-build`).

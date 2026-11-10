@@ -8,6 +8,7 @@ related_specs:
   - feature-sound-effects
   - feature-retention-polish
   - feature-crazygames-cloud-save
+  - feature-portal-quality-pass
 evidence_files:
   - docs/crazygames.md
   - reports/nono-grid-crazygames-verification.md

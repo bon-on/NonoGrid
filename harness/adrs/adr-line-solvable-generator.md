@@ -10,6 +10,7 @@ related_specs:
   - feature-how-to-play-tutorial
   - feature-retention-polish
   - feature-random-practice
+  - feature-portal-quality-pass
 ---
 
 # ADR: Generate levels from seeded random grids accepted only when line logic solves them
@@ -62,3 +63,10 @@ and still allows puzzles that need deep trial and error.
 
 ## Random default with persistent assignments
 New levels receive a persisted independent nonzero seed, generated at the existing sizeForLevel difficulty. Default generator calls still use seed=level for legacy compatibility. New assignments bypass curated pictures. Seeds live in the same local/cloud progress envelope as board marks and records. Existing v1/v2 saves retain deterministic content for exposed levels so old marks and album entries remain valid. Reopening an unfinished level preserves its seed; completing a level advances the next startup when no unfinished board needs resuming. There is no separate random mode.
+
+## Note 2026-11-11
+
+The generator is unchanged. Level 1 of a new player picks among seeds
+derived from the drawn one (`friendlyFirstSeed`, feature-portal-quality-pass).
+Portal builds also run as dart2wasm; `test/web/generator_parity_test.dart`
+checks VM, dart2js and dart2wasm produce identical puzzles.

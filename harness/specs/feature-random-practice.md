@@ -51,3 +51,10 @@ No new dependencies, no external runtime calls, English ASCII lib strings. Puzzl
 - flutter build web --release --base-href /NonoGrid/
 - tool/build_crazygames.sh and tool/build_gamepix.sh
 - node <harness-lab>/dist/index.js audit . --format md
+
+## Update 2026-11-11 (feature-portal-quality-pass)
+
+A new level 1 assignment saves `friendlyFirstSeed(drawn seed)`: the drawn
+seed or a seed derived from it whose puzzle has a fully filled line and at
+least three lines settled by their clue alone. Other levels keep the drawn
+seed; the generator is unchanged.

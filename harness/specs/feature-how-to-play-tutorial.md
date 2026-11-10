@@ -67,3 +67,11 @@ We want a short, skippable tutorial on the first launch only.
 - flutter analyze
 - flutter build web --release --base-href /NonoGrid/
 - harness-lab audit
+
+## Update 2026-11-11 (feature-portal-quality-pass)
+
+First launch no longer opens the card. A non-blocking tip strip coaches the
+first puzzle instead and stores `tutorial_seen_v1` when it ends; the "?"
+card keeps every behaviour above (steps, Skip/Escape, keys, clock pause,
+browser shortcuts). Criteria about the card appearing on launch now apply
+to the card opened with "?". See `feature-portal-quality-pass`.

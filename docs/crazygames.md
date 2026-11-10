@@ -14,8 +14,9 @@ Output:
 - `build/crazygames/`: bundle folder
 - `build/nono-grid-crazygames.zip`: zip to upload
 
-The script runs `flutter build web --release --base-href / --no-web-resources-cdn
---dart-define=CRAZYGAMES=true`, switches `<base href>` to `./`, inserts the SDK script
+The script runs `flutter build web --release --wasm --base-href / --no-web-resources-cdn
+--dart-define=CRAZYGAMES=true` (WebAssembly on Chromium browsers, JavaScript elsewhere and as a fallback; see
+`adr-web-wasm-portal-build`), removes the unused `wimp.*` renderer, switches `<base href>` to `./`, inserts the SDK script
 before `flutter_bootstrap.js`, removes `*.symbols` and checks the limits (at most 1500
 files, 50MB) and the result. It fails loudly if any check fails.
 
@@ -41,14 +42,14 @@ On `localhost` the SDK environment is `local`; the console logs
 | When | Call |
 |---|---|
 | App start | `SDK.init()`; SDK disabled unless environment is `crazygames` or `local` |
-| Playing (tutorial closed, puzzle not cleared) | `gameplayStart()` |
+| Playing (no overlay open, puzzle not cleared; first-run tips never block) | `gameplayStart()` |
 | How-to-play overlay opens | `gameplayStop()` |
 | Overlay closes | `gameplayStart()` |
 | puzzle cleared | `gameplayStop()` |
 | Next puzzle / restart after clear | `gameplayStart()` |
 
-Only transitions are reported. On first launch the first start comes after the tutorial
-closes.
+Only transitions are reported. First launch shows a non-blocking tip strip instead of the
+How to play card, so the first start comes right after launch.
 
 ## Progress Save
 

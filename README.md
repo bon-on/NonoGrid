@@ -85,9 +85,11 @@ mark along the stroke instead. **Check** briefly highlights wrong fills; there
 is no penalty beyond the star (free mode). The timer starts on your first move and best times
 are kept per level.
 
-The first launch shows a skippable "How to play" card (Enter/Space next, Esc
-skip, arrows move between steps); the `?` button in the top bar reopens it and
-the timer is paused while it is open.
+The first launch shows three short tips in a strip above the board (they
+never block play and advance as you fill, mark and finish lines; the close
+button hides them). The `?` button opens the full "How to play" card
+(Enter/Space next, Esc skip, arrows move between steps); the timer is paused
+while it is open.
 
 Sound effects (fill, mark, undo, line done, mistake, star, level up, solved)
 and a gentle music-box loop play on every platform; the speaker button next
