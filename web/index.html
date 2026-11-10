@@ -33,7 +33,7 @@
   <title>NonoGrid</title>
   <meta name="theme-color" content="#161925">
   <link rel="manifest" href="manifest.json">
-  <style>body { background-color: #161925; }</style>
+  <style>body { background-color: #B98B5C; }</style>
   <style>
     :root { --games-nav-height: calc(48px + env(safe-area-inset-top)); }
     /* Flutter renders into this host, which starts below the nav bar. */
@@ -72,6 +72,9 @@
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
     }
+    /* First-frame splash: drawn by the browser before any Flutter file has
+       loaded, in the desk colours of the default theme so the hand-off to
+       the game is seamless (feature-portal-quality-pass). */
     #loader {
       position: fixed;
       inset: var(--games-nav-height) 0 0 0;
@@ -79,23 +82,54 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 20px;
-      background: #161925;
-      color: #F1F5F9;
+      gap: 18px;
+      background: radial-gradient(circle at 50% 40%, #D8B184, #B98B5C 75%);
+      color: #233059;
       font-family: Roboto, Arial, sans-serif;
-      font-size: 28px;
-      font-weight: 700;
       z-index: 1;
+      transition: opacity .25s ease-out;
     }
-    #loader .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid rgba(255, 255, 255, 0.2);
-      border-top-color: #F1F5F9;
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
+    #loader.done { opacity: 0; pointer-events: none; }
+    #loader .card {
+      display: grid;
+      grid-template-columns: repeat(5, 14px);
+      gap: 3px;
+      padding: 14px;
+      background: #FBF6EA;
+      border: 2px solid #233059;
+      border-radius: 10px;
+      box-shadow: 0 4px 0 #233059;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    #loader .card i {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      background: #EDE3CC;
+    }
+    /* Fills the heart once; no endless animation on the board. */
+    #loader .card i.on { animation: ink .3s ease-out forwards; }
+    @keyframes ink { to { background: #E8704F; } }
+    #loader .title { font-size: 30px; font-weight: 900; letter-spacing: .5px; }
+    #loader .bar {
+      width: 160px;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(35, 48, 89, .18);
+      overflow: hidden;
+    }
+    #loader .bar span {
+      display: block;
+      width: 40%;
+      height: 100%;
+      border-radius: 3px;
+      background: #233059;
+      animation: slide 1.1s ease-in-out infinite alternate;
+    }
+    @keyframes slide { from { transform: translateX(-10%); } to { transform: translateX(160%); } }
+    @media (prefers-reduced-motion: reduce) {
+      #loader .card i.on { animation: none; background: #E8704F; }
+      #loader .bar span { animation: none; width: 100%; opacity: .5; }
+    }
   </style>
 </head>
 <body>
@@ -110,7 +144,17 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <div id="loader"><div class="spinner"></div><div>NonoGrid</div></div>
+  <div id="loader" role="status" aria-label="Loading NonoGrid">
+    <div class="card" aria-hidden="true">
+      <i></i><i class="on" style="animation-delay:.1s"></i><i></i><i class="on" style="animation-delay:.15s"></i><i></i>
+      <i class="on" style="animation-delay:.2s"></i><i class="on" style="animation-delay:.25s"></i><i class="on" style="animation-delay:.3s"></i><i class="on" style="animation-delay:.35s"></i><i class="on" style="animation-delay:.4s"></i>
+      <i class="on" style="animation-delay:.45s"></i><i class="on" style="animation-delay:.5s"></i><i class="on" style="animation-delay:.55s"></i><i class="on" style="animation-delay:.6s"></i><i class="on" style="animation-delay:.65s"></i>
+      <i></i><i class="on" style="animation-delay:.7s"></i><i class="on" style="animation-delay:.75s"></i><i class="on" style="animation-delay:.8s"></i><i></i>
+      <i></i><i></i><i class="on" style="animation-delay:.85s"></i><i></i><i></i>
+    </div>
+    <div class="title">NonoGrid</div>
+    <div class="bar"><span></span></div>
+  </div>
   <script>
     // Remove the loader once Flutter has rendered its first frame.
     (function () {
@@ -121,7 +165,9 @@
         done = true;
         if (observer) observer.disconnect();
         var el = document.getElementById('loader');
-        if (el) el.remove();
+        if (!el) return;
+        el.classList.add('done');
+        setTimeout(function () { el.remove(); }, 300);
       }
       window.addEventListener('flutter-first-frame', hide);
       document.addEventListener('flutter-first-frame', hide);

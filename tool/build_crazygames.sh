@@ -10,7 +10,10 @@ ZIP="$ROOT/build/nono-grid-crazygames.zip"
 SDK_URL="https://sdk.crazygames.com/crazygames-sdk-v3.js"
 
 rm -rf "$OUT" "$ZIP"
-flutter build web --release \
+# --wasm: Chromium browsers (Chrome, Edge) load the smaller dart2wasm + skwasm
+# build; Firefox, Safari and older browsers use dart2js + CanvasKit (Flutter's
+# default wasm allow list; feature-portal-quality-pass).
+flutter build web --release --wasm \
   --base-href / \
   --no-web-resources-cdn \
   --dart-define=CRAZYGAMES=true \
@@ -44,15 +47,38 @@ fi
 # Copied daily results may only carry the CrazyGames page (from the SDK),
 # never the GitHub Pages link (feature-daily-puzzle).
 [[ -s "$OUT/main.dart.js" ]] || { echo "error: main.dart.js missing" >&2; exit 1; }
-if grep -q -e 'bon-on.github.io' "$OUT/main.dart.js"; then
-  echo "error: hub link present in main.dart.js" >&2
-  exit 1
-fi
+for code in main.dart.js main.dart.wasm main.dart.mjs; do
+  if grep -a -q -e 'bon-on.github.io' "$OUT/$code"; then
+    echo "error: hub link present in $code" >&2
+    exit 1
+  fi
+done
 
 if ! grep -q -e 'user-select: none' "$INDEX"; then
   echo "error: user-select rule missing from index.html" >&2
   exit 1
 fi
+
+# Renderer files: the loader picks skwasm (or skwasm_heavy on Chromium builds
+# without codecs/break iterators) for the wasm build and canvaskit (chromium/
+# or generic) for the JavaScript fallback. wimp is only used with an explicit opt-in flag.
+find "$OUT/canvaskit" -name 'wimp.*' -delete
+for f in main.dart.js main.dart.wasm main.dart.mjs canvaskit/skwasm.wasm canvaskit/skwasm_heavy.wasm \
+  canvaskit/canvaskit.wasm canvaskit/chromium/canvaskit.wasm; do
+  [[ -s "$OUT/$f" ]] || { echo "error: $f missing" >&2; exit 1; }
+done
+grep -q '"compileTarget":"dart2wasm"' "$OUT/flutter_bootstrap.js" || { echo "error: wasm build missing from bootstrap" >&2; exit 1; }
+grep -q '"compileTarget":"dart2js"' "$OUT/flutter_bootstrap.js" || { echo "error: JavaScript fallback missing from bootstrap" >&2; exit 1; }
+grep -q "renderer: 'canvaskit'" "$OUT/flutter_bootstrap.js" || { echo "error: JavaScript retry missing from bootstrap" >&2; exit 1; }
+# Fonts are downloaded before the first frame: keep the subset fonts small.
+shopt -s nullglob
+fonts=("$OUT"/assets/assets/fonts/Roboto-*.ttf)
+shopt -u nullglob
+(( ${#fonts[@]} == 4 )) || { echo "error: expected 4 Roboto fonts, found ${#fonts[@]}" >&2; exit 1; }
+for font in "${fonts[@]}"; do
+  size=$(wc -c <"$font")
+  if (( size > 60000 )); then echo "error: $font is not the subset font (tool/subset_fonts.sh)" >&2; exit 1; fi
+done
 
 # Debug symbol files are not needed at runtime.
 find "$OUT" -name '*.symbols' -delete
