@@ -124,7 +124,10 @@ void main() {
       final s = await GameStorage.open(seedSource: () => 12345);
       expect(s.progress, isNull);
       expect(s.xp, 20);
-      expect(s.puzzleFor(1).solution, generatePuzzle(1, seed: 12345).solution);
+      expect(
+        s.puzzleFor(1).solution,
+        generatePuzzle(1, seed: friendlyFirstSeed(12345)).solution,
+      );
     },
   );
   test(

@@ -36,6 +36,14 @@ Future<GameStorage> _launch(
   return s;
 }
 
+final _coach = find.byKey(const Key('coach-strip'));
+
+/// Opens the full How to play card with the "?" button.
+Future<void> _openCard(WidgetTester t) async {
+  await t.tap(find.byKey(const Key('how-to-play-button')));
+  await t.pump();
+}
+
 Offset _lastCell(WidgetTester t) {
   final paint = find.descendant(
     of: find.byType(NonoBoard),
@@ -45,10 +53,26 @@ Offset _lastCell(WidgetTester t) {
 }
 
 void main() {
-  testWidgets('first launch shows overlay and blocks taps and game keys', (
+  testWidgets('first launch shows the tip strip, no card, board playable', (
     t,
   ) async {
+    final store = MemoryTutorialStore();
+    final s = await _launch(t, store);
+    expect(_overlay, findsNothing);
+    expect(_coach, findsOneWidget);
+    await t.tapAt(_lastCell(t));
+    await t.pump();
+    expect(s.progress, isNotNull, reason: 'the strip never blocks the board');
+    expect(store.seen, isFalse);
+    await t.tap(find.byKey(const Key('coach-dismiss')));
+    await t.pump();
+    expect(_coach, findsNothing);
+    expect(store.seen, isTrue);
+  });
+
+  testWidgets('open card blocks taps and game keys', (t) async {
     final s = await _launch(t, MemoryTutorialStore());
+    await _openCard(t);
     expect(_overlay, findsOneWidget);
     expect(find.text('How to play'), findsOneWidget);
 
@@ -69,6 +93,7 @@ void main() {
   testWidgets('Next walks steps, Play closes and stores the flag', (t) async {
     final store = MemoryTutorialStore();
     await _launch(t, store);
+    await _openCard(t);
     final t0 = _stepText(t);
     expect(find.text('Next'), findsOneWidget);
     await t.tap(find.byKey(const Key('how-to-play-next')));
@@ -87,13 +112,16 @@ void main() {
   testWidgets('Skip closes and stores the flag; Escape also skips', (t) async {
     final store = MemoryTutorialStore();
     await _launch(t, store);
+    await _openCard(t);
     await t.tap(find.byKey(const Key('how-to-play-skip')));
     await t.pump();
     expect(_overlay, findsNothing);
     expect(store.seen, isTrue);
+    expect(_coach, findsNothing, reason: 'reading the card ends the tips');
 
     final store2 = MemoryTutorialStore();
     await _launch(t, store2);
+    await _openCard(t);
     expect(_overlay, findsOneWidget);
     await t.sendKeyEvent(LogicalKeyboardKey.escape);
     await t.pump();
@@ -106,6 +134,7 @@ void main() {
   ) async {
     final store = MemoryTutorialStore();
     final s = await _launch(t, store);
+    await _openCard(t);
     final t0 = _stepText(t);
     await t.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await t.pump();
@@ -124,14 +153,19 @@ void main() {
     expect(s.progress, isNull); // Space did not fill a cell.
   });
 
-  testWidgets('overlay does not appear when the flag is set', (t) async {
+  testWidgets('neither card nor tips appear when the flag is set', (t) async {
     await _launch(t, MemoryTutorialStore(seen: true));
     expect(_overlay, findsNothing);
+    expect(_coach, findsNothing);
   });
 
   testWidgets('storage failures never break play', (t) async {
     await _launch(t, _BrokenTutorialStore());
-    expect(_overlay, findsOneWidget);
+    expect(_coach, findsOneWidget, reason: 'a read failure shows the tips');
+    await t.tap(find.byKey(const Key('coach-dismiss')));
+    await t.pump();
+    expect(_coach, findsNothing);
+    await _openCard(t);
     await t.tap(find.byKey(const Key('how-to-play-skip')));
     await t.pump();
     expect(_overlay, findsNothing);
@@ -212,7 +246,7 @@ void main() {
     expect(find.text('0:01'), findsOneWidget);
   });
 
-  testWidgets('first-run overlay does not start the clock', (t) async {
+  testWidgets('first run: the clock waits for the first move', (t) async {
     await _launch(t, MemoryTutorialStore());
     await t.runAsync(() => Future.delayed(const Duration(milliseconds: 1300)));
     await t.pump(const Duration(milliseconds: 600));
@@ -225,8 +259,17 @@ void main() {
     Size(1280, 720),
     Size(320, 640),
   ]) {
-    testWidgets('overlay and header fit $size', (t) async {
+    testWidgets('tips, overlay and header fit $size', (t) async {
       await _launch(t, MemoryTutorialStore(), size: size);
+      expect(_coach, findsOneWidget);
+      final strip = t.getRect(_coach);
+      expect(strip.left, greaterThanOrEqualTo(0));
+      expect(strip.right, lessThanOrEqualTo(size.width));
+      expect(strip.top, greaterThanOrEqualTo(0));
+      // The board keeps room below the strip.
+      expect(t.getRect(find.byType(NonoBoard)).height, greaterThan(150));
+      expect(t.takeException(), isNull);
+      await _openCard(t);
       expect(_overlay, findsOneWidget);
       final r = t.getRect(_overlay);
       expect(r.width, lessThanOrEqualTo(360));
@@ -259,6 +302,7 @@ void main() {
     );
     await t.pump();
     await t.pump();
+    await _openCard(t);
 
     await t.sendKeyEvent(LogicalKeyboardKey.f5);
     await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
@@ -273,6 +317,7 @@ void main() {
 
   testWidgets('key repeat does not paint after the card closes', (t) async {
     final s = await _launch(t, MemoryTutorialStore());
+    await _openCard(t);
     // Space is held while the card is open, then the card closes.
     await t.sendKeyDownEvent(LogicalKeyboardKey.space);
     await t.tap(find.byKey(const Key('how-to-play-skip')));
@@ -284,5 +329,39 @@ void main() {
     await t.sendKeyEvent(LogicalKeyboardKey.space);
     await t.pump();
     expect(s.progress, isNotNull, reason: 'a fresh press still paints');
+  });
+
+  testWidgets('tips follow real play: fill, cross, Logic hint', (t) async {
+    t.view.physicalSize = const Size(1280, 720);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    // Legacy level 1 is the heart: row 1 is a full line.
+    SharedPreferences.setMockInitialValues({'level': 1});
+    final s = await GameStorage.open();
+    final store = MemoryTutorialStore();
+    await t.pumpWidget(NonoGridApp(storage: s, tutorialStore: store));
+    await t.pump();
+    await t.pump();
+    expect(find.textContaining('A 5 fills the whole line'), findsOneWidget);
+
+    await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await t.sendKeyEvent(LogicalKeyboardKey.space);
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('to cross out cells'), findsOneWidget);
+    // Undo does not move the tips back or forward.
+    await t.sendKeyEvent(LogicalKeyboardKey.keyU);
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('to cross out cells'), findsOneWidget);
+
+    await t.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await t.sendKeyEvent(LogicalKeyboardKey.keyX);
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Logic hint shows'), findsOneWidget);
+    expect(store.seen, isFalse);
+
+    await t.tap(find.byKey(const Key('logic-hint')));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(_coach, findsNothing);
+    expect(store.seen, isTrue);
   });
 }

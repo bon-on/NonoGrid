@@ -17,12 +17,14 @@ import '../logic/line_solver.dart';
 import '../logic/logic_hint.dart';
 import '../logic/puzzle.dart';
 import '../meta/daily.dart';
+import '../meta/first_run_coach.dart';
 import '../meta/progress_rules.dart';
 import '../platform/game_platform.dart';
 import '../share/result_copy.dart';
 import '../storage.dart';
 import 'board.dart';
 import 'board_fx.dart';
+import 'coach_strip.dart';
 import 'daily_ui.dart';
 import 'how_to_play.dart';
 import 'overlays.dart';
@@ -147,6 +149,11 @@ class _GameScreenState extends State<GameScreen>
   bool _resumeAfterOverlay = false;
   late final TutorialStore _tutorialStore =
       widget.tutorialStore ?? PrefsTutorialStore();
+
+  /// First-run tips next to the board; replaces the old blocking card on
+  /// first launch (feature-portal-quality-pass).
+  FirstRunCoach _coach = FirstRunCoach(active: false);
+  bool _tutorialSaved = false;
 
   _Panel _panel = _Panel.none;
   ClearResult? _result;
@@ -281,8 +288,9 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Line effects and sounds after a finished action that changed the board.
-  void _lineFeedback(List<Mark> before) {
-    if (_game.isWon) return;
+  /// Returns how many lines it celebrated.
+  int _lineFeedback(List<Mark> before) {
+    if (_game.isWon) return 0;
     final was = _LineState(_game.puzzle, before);
     final now = _LineState(_game.puzzle, _game.cells);
     final newOverRows = now.rowsOver.difference(was.rowsOver);
@@ -296,7 +304,7 @@ class _GameScreenState extends State<GameScreen>
       }
       _fx.shake();
       _sfx.play(Sfx.mistake);
-      return;
+      return 0;
     }
     final doneRows = now.rowsDone.difference(was.rowsDone);
     final doneCols = now.colsDone.difference(was.colsDone);
@@ -315,6 +323,7 @@ class _GameScreenState extends State<GameScreen>
     if (count >= 2) {
       _flash(count == 2 ? 'Double line!' : '$count lines at once!');
     }
+    return count;
   }
 
   /// Plays the one sound of a finished fill/mark action: level_clear on a
@@ -325,7 +334,20 @@ class _GameScreenState extends State<GameScreen>
       _sfx.play(Sfx.levelClear);
     } else if (before != null && !listEquals(before, _game.cells)) {
       _sfx.play(tool == Tool.fill ? Sfx.fill : Sfx.mark);
-      _lineFeedback(before);
+      final lines = _lineFeedback(before);
+      var filled = 0, crossed = 0;
+      for (var i = 0; i < before.length; i++) {
+        if (before[i] == _game.cells[i]) continue;
+        if (_game.cells[i] == Mark.filled) filled++;
+        if (_game.cells[i] == Mark.crossed) crossed++;
+      }
+      _coachChanged(
+        _coach.onBoardChange(
+          filledAdded: filled,
+          crossedAdded: crossed,
+          linesDone: lines,
+        ),
+      );
     }
   }
 
@@ -341,10 +363,55 @@ class _GameScreenState extends State<GameScreen>
     if (!mounted) return;
     setState(() {
       _tutorialChecked = true;
-      if (!seen) _openTutorial();
+      // New players get the tip strip and can play right away; the full
+      // How to play card stays one tap away on "?".
+      if (!seen) _coach = FirstRunCoach(active: true);
     });
     _syncGameplay();
   }
+
+  /// Stores the tutorial flag once; failures never break play.
+  void _markTutorialSeen() {
+    if (_tutorialSaved) return;
+    _tutorialSaved = true;
+    () async {
+      try {
+        await _tutorialStore.markSeen();
+      } catch (_) {}
+    }();
+  }
+
+  /// Applies a coach transition: redraws, and stores the flag when done.
+  void _coachChanged(bool changed) {
+    if (!changed) return;
+    if (!_coach.visible) _markTutorialSeen();
+    if (mounted) setState(() {});
+  }
+
+  void _dismissCoach() {
+    _coachChanged(_coach.dismiss());
+    _focus.requestFocus();
+  }
+
+  /// Size of the board when the puzzle has a completely filled line.
+  int? get _fullLine {
+    final n = _game.size;
+    final clues = _game.puzzle.clues;
+    final full = [
+      ...clues.rows,
+      ...clues.cols,
+    ].any((l) => l.length == 1 && l.first == n);
+    return full ? n : null;
+  }
+
+  bool get _showCoach => _coach.visible && _tutorialChecked && !_game.isWon;
+
+  Widget _coachStrip(PaperPalette p, {required bool pointer}) => CoachStrip(
+    palette: p,
+    step: _coach.step,
+    text: coachText(_coach.step, fullLine: _fullLine, pointer: pointer),
+    onDismiss: _dismissCoach,
+  );
 
   /// Pauses the clock for an overlay. Call inside setState.
   void _pauseForOverlay() {
@@ -371,16 +438,15 @@ class _GameScreenState extends State<GameScreen>
   void _closeTutorial() {
     setState(() {
       _tutorialOpen = false;
+      // Reading the full card covers what the tip strip would teach.
+      _coach.dismiss();
       _resumeAfterClose();
     });
     _syncGameplay();
     _focus.requestFocus();
     _maybeOpenSummary();
-    () async {
-      try {
-        await _tutorialStore.markSeen();
-      } catch (_) {}
-    }();
+    _tutorialSaved = false;
+    _markTutorialSeen();
   }
 
   void _tutorialNext() {
@@ -768,6 +834,7 @@ class _GameScreenState extends State<GameScreen>
     _onStrokeEnd();
     if (_game.isWon) return;
     _logicHint = _deduceHint();
+    _coachChanged(_coach.onHintOpened());
     _openPanel(_Panel.logic);
   }
 
@@ -824,6 +891,7 @@ class _GameScreenState extends State<GameScreen>
   void _afterChange() {
     _syncGameplay();
     if (_game.isWon) {
+      _coachChanged(_coach.onSolved());
       _clock.stop();
       final seconds = _elapsed;
       final generation = _boardGeneration;
@@ -1036,8 +1104,8 @@ class _GameScreenState extends State<GameScreen>
     final result = _result;
     return [
       if (_panel == _Panel.logic && _logicHint != null)
-        Positioned.fill(
-          child: ColoredBox(
+        _panelLayer(
+          ColoredBox(
             color: Colors.black54,
             child: AlertDialog(
               title: const Text('Logic hint'),
@@ -1063,8 +1131,8 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       if (_panel == _Panel.summary && result != null)
-        Positioned.fill(
-          child: SummaryOverlay(
+        _panelLayer(
+          SummaryOverlay(
             key: ValueKey('summary-${_dailyDay ?? 'level'}-$_level'),
             palette: p,
             result: result,
@@ -1086,8 +1154,8 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       if (_panel == _Panel.album)
-        Positioned.fill(
-          child: AlbumOverlay(
+        _panelLayer(
+          AlbumOverlay(
             palette: p,
             sets: _storage.albumSets,
             goal: _storage.setGoal,
@@ -1102,8 +1170,8 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       if (_panel == _Panel.levels)
-        Positioned.fill(
-          child: LevelMapOverlay(
+        _panelLayer(
+          LevelMapOverlay(
             palette: p,
             page: _mapPage,
             selected: _mapSel,
@@ -1125,8 +1193,8 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       if (_panel == _Panel.themes)
-        Positioned.fill(
-          child: ThemeOverlay(
+        _panelLayer(
+          ThemeOverlay(
             palette: p,
             current: _storage.theme,
             selected: _themeSel,
@@ -1136,8 +1204,8 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       if (_panel == _Panel.daily)
-        Positioned.fill(
-          child: DailyOverlay(
+        _panelLayer(
+          DailyOverlay(
             palette: p,
             info: _dailyInfo(),
             playing: _dailyDay != null && _dailyDay == _today,
@@ -1148,8 +1216,8 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
       if (_tutorialOpen)
-        Positioned.fill(
-          child: HowToPlayOverlay(
+        _panelLayer(
+          HowToPlayOverlay(
             palette: p,
             steps: nonoGridSteps,
             step: _tutorialStep,
@@ -1186,6 +1254,10 @@ class _GameScreenState extends State<GameScreen>
     ];
   }
 
+  /// Full-screen overlay layer that eases in instead of popping.
+  Widget _panelLayer(Widget child) =>
+      Positioned.fill(child: _FadeIn(child: child));
+
   Widget _board(PaperPalette p) => NonoBoard(
     game: _game,
     tool: _tool,
@@ -1216,7 +1288,20 @@ class _GameScreenState extends State<GameScreen>
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: _board(p),
+              child: Column(
+                children: [
+                  if (_showCoach)
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 520),
+                        child: _coachStrip(p, pointer: true),
+                      ),
+                    ),
+                  // Room for the board card's tape, drawn above the card.
+                  if (_showCoach) const SizedBox(height: 10),
+                  Expanded(child: _board(p)),
+                ],
+              ),
             ),
           ),
           SizedBox(width: rightW, child: _toolPanel(p)),
@@ -1813,6 +1898,11 @@ class _GameScreenState extends State<GameScreen>
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: _dailyCard(p, compact: true),
         ),
+        if (_showCoach)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
+            child: _coachStrip(p, pointer: false),
+          ),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
@@ -1869,4 +1959,23 @@ class _MiniStarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MiniStarPainter old) => old.p != p;
+}
+
+/// Short ease-in for overlays (no repeat, no cost once settled). Opacity
+/// starts above zero so the overlay is never dropped from semantics.
+class _FadeIn extends StatelessWidget {
+  const _FadeIn({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: const Duration(milliseconds: 180),
+    curve: Curves.easeOutCubic,
+    builder: (context, t, child) => Opacity(
+      opacity: 0.25 + 0.75 * t,
+      child: Transform.scale(scale: 0.98 + 0.02 * t, child: child),
+    ),
+    child: child,
+  );
 }

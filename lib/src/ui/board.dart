@@ -21,7 +21,9 @@ class BoardMetrics {
   );
 
   static const double minFont = 11;
-  static const double maxCell = 64;
+
+  /// Large enough that a 5x5 fills most of a desktop window.
+  static const double maxCell = 84;
 
   factory BoardMetrics.fit({
     required int n,
@@ -42,7 +44,7 @@ class BoardMetrics {
     // iterate a few times, then derive the cell from the final font.
     var font = 16.0;
     for (var i = 0; i < 4; i++) {
-      font = (cellFor(font) * 0.5).clamp(minFont, 18.0);
+      font = (cellFor(font) * 0.5).clamp(minFont, 20.0);
     }
     var cell = cellFor(font);
     cell = math.max(cell, 8);

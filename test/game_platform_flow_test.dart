@@ -130,13 +130,14 @@ void main() {
     expect(platform.events, ['start', 'stop', 'start']);
   });
 
-  testWidgets('first launch starts only after the tutorial closes', (t) async {
+  testWidgets('first launch starts at once: tips never block play', (t) async {
     final platform = await _launch(t, tutorialSeen: false);
-    expect(platform.events, isEmpty);
-
-    await t.tap(find.byKey(const Key('how-to-play-skip')));
-    await t.pump();
+    expect(find.byKey(const Key('coach-strip')), findsOneWidget);
     expect(platform.events, ['start']);
+
+    await t.tap(find.byKey(const Key('coach-dismiss')));
+    await t.pump();
+    expect(platform.events, ['start'], reason: 'hiding tips is no transition');
   });
 
   testWidgets('solving a puzzle stops, next puzzle starts', (t) async {

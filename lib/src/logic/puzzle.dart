@@ -87,6 +87,46 @@ Puzzle puzzleForLevel(int level, {GeneratorStats? stats}) {
   return generatePuzzle(level, stats: stats);
 }
 
+/// True when [clue] alone settles every cell of a line of [size] cells:
+/// an empty line, or runs that exactly fill it (`5`, `2 2`, `1 1 1`).
+bool lineFixedByClue(List<int> clue, int size) {
+  if (clue.isEmpty) return true;
+  final sum = clue.fold(0, (a, b) => a + b);
+  return sum + clue.length - 1 == size;
+}
+
+/// A welcoming first puzzle: at least one completely filled line (an obvious
+/// first move) and at least [minFixed] lines whose clue alone settles them.
+bool isFriendlyFirstPuzzle(Puzzle puzzle, {int minFixed = 3}) {
+  final n = puzzle.size;
+  final lines = [...puzzle.clues.rows, ...puzzle.clues.cols];
+  final hasFullLine = lines.any((l) => l.length == 1 && l.first == n);
+  final fixed = lines.where((l) => lineFixedByClue(l, n)).length;
+  return hasFullLine && fixed >= minFixed;
+}
+
+/// How many candidates [friendlyFirstSeed] tries.
+const int kFriendlySeedTries = 24;
+
+/// Picks the seed of a new player's level 1 (feature-portal-quality-pass).
+///
+/// Tries [seed] first, then seeds derived from it with [SeededRng], and
+/// returns the first whose puzzle [isFriendlyFirstPuzzle]; falls back to
+/// [seed]. Deterministic, so the chosen seed is simply saved as the level's
+/// assignment and the generator itself is unchanged.
+int friendlyFirstSeed(int seed) {
+  final rng = SeededRng(seed);
+  var candidate = seed;
+  for (var i = 0; i < kFriendlySeedTries; i++) {
+    if (candidate != 0 &&
+        isFriendlyFirstPuzzle(generatePuzzle(1, seed: candidate))) {
+      return candidate;
+    }
+    candidate = rng.nextUint32();
+  }
+  return seed;
+}
+
 const double kMinDensity = 0.45;
 const double kMaxDensity = 0.68;
 

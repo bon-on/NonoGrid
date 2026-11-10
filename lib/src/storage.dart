@@ -450,8 +450,10 @@ class GameStorage {
   Puzzle puzzleFor(int level) {
     if (level < 1) throw ArgumentError.value(level, 'level');
     if (level > _data.legacyThrough && !_data.puzzleSeeds.containsKey(level)) {
-      final seed = _seedSource() & 0xFFFFFFFF;
-      _data.puzzleSeeds[level] = seed == 0 ? 1 : seed;
+      final drawn = _seedSource() & 0xFFFFFFFF;
+      final seed = drawn == 0 ? 1 : drawn;
+      // A new player's very first puzzle gets an obvious opening move.
+      _data.puzzleSeeds[level] = level == 1 ? friendlyFirstSeed(seed) : seed;
       _puzzles.remove(level);
       unawaited(_save());
     }
