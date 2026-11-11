@@ -94,6 +94,10 @@ void main() {
     Size(844, 390),
     Size(667, 375),
     Size(320, 640),
+    Size(620, 349),
+    Size(560, 315),
+    Size(640, 480),
+    Size(320, 568),
   ]) {
     testWidgets('main screen and summary fit $size', (t) async {
       await _launch(t, size: size);

@@ -63,6 +63,9 @@ enum ScreenLayout {
 /// would leave the board too little height there.
 const double kCompactMaxHeight = 560;
 
+/// Compact windows narrower than this show the tool column as icons only.
+const double kCompactIconToolsMaxWidth = 600;
+
 /// Stacked windows shorter than this fold Daily, Levels, Album and Themes
 /// into a single row so the board keeps its height.
 const double kFoldedMetaMaxHeight = 700;
@@ -443,16 +446,11 @@ class _GameScreenState extends State<GameScreen>
 
   bool get _showCoach => _coach.visible && _tutorialChecked && !_game.isWon;
 
-  Widget _coachStrip(
-    PaperPalette p, {
-    required bool pointer,
-    int maxLines = 3,
-  }) => CoachStrip(
+  Widget _coachStrip(PaperPalette p, {required bool pointer}) => CoachStrip(
     palette: p,
     step: _coach.step,
     text: coachText(_coach.step, fullLine: _fullLine, pointer: pointer),
     onDismiss: _dismissCoach,
-    maxLines: maxLines,
   );
 
   /// Pauses the clock for an overlay. Call inside setState.
@@ -1733,12 +1731,14 @@ class _GameScreenState extends State<GameScreen>
     required bool vertical,
     bool dense = false,
     bool slim = false,
+    bool iconOnly = false,
   }) {
     final items = <Widget>[
       PaperButton(
         key: const Key('tool-fill'),
         palette: p,
         label: 'Fill',
+        iconOnly: iconOnly,
         icon: Icons.square_rounded,
         selected: _tool == Tool.fill,
         compact: !vertical || dense,
@@ -1749,6 +1749,7 @@ class _GameScreenState extends State<GameScreen>
         key: const Key('tool-cross'),
         palette: p,
         label: 'Mark X',
+        iconOnly: iconOnly,
         icon: Icons.close_rounded,
         selected: _tool == Tool.cross,
         compact: !vertical || dense,
@@ -1758,7 +1759,7 @@ class _GameScreenState extends State<GameScreen>
       PaperButton(
         palette: p,
         label: 'Undo',
-        iconOnly: slim,
+        iconOnly: slim || iconOnly,
         icon: Icons.undo_rounded,
         compact: true,
         expand: vertical,
@@ -1768,6 +1769,7 @@ class _GameScreenState extends State<GameScreen>
         key: const Key('logic-hint'),
         palette: p,
         label: 'Logic hint',
+        iconOnly: iconOnly,
         icon: Icons.lightbulb_outline,
         compact: true,
         expand: vertical,
@@ -1776,7 +1778,7 @@ class _GameScreenState extends State<GameScreen>
       PaperButton(
         palette: p,
         label: 'Check',
-        iconOnly: slim,
+        iconOnly: slim || iconOnly,
         icon: Icons.fact_check_outlined,
         compact: true,
         expand: vertical,
@@ -1785,7 +1787,7 @@ class _GameScreenState extends State<GameScreen>
       PaperButton(
         palette: p,
         label: 'Restart',
-        iconOnly: slim,
+        iconOnly: slim || iconOnly,
         icon: Icons.refresh_rounded,
         compact: true,
         expand: vertical,
@@ -1812,11 +1814,18 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _winBox(PaperPalette p, {required bool vertical, bool small = false}) {
+  Widget _winBox(
+    PaperPalette p, {
+    required bool vertical,
+    bool small = false,
+    bool iconOnly = false,
+  }) {
     final best = _dailyDay != null ? null : _storage.bestSeconds(_level);
     final text = Text(
-      '$_levelTitle! Solved in ${formatTime(_elapsed)}'
-      '${best != null ? '  Best ${formatTime(best)}' : ''}',
+      iconOnly
+          ? formatTime(_elapsed)
+          : '$_levelTitle! Solved in ${formatTime(_elapsed)}'
+                '${best != null ? '  Best ${formatTime(best)}' : ''}',
       textAlign: vertical ? TextAlign.center : TextAlign.start,
       maxLines: small ? 4 : 2,
       overflow: TextOverflow.ellipsis,
@@ -1835,6 +1844,7 @@ class _GameScreenState extends State<GameScreen>
           : Icons.arrow_forward_rounded,
       primary: true,
       expand: vertical,
+      iconOnly: iconOnly,
       onPressed: _advance,
     );
     if (vertical) {
@@ -1930,7 +1940,10 @@ class _GameScreenState extends State<GameScreen>
   // on their side). Board first: slim info column, board, slim tool column.
   Widget _compactLayout(PaperPalette p, Size size) {
     final leftW = (size.width * 0.27).clamp(160.0, 190.0);
-    final rightW = (size.width * 0.21).clamp(124.0, 150.0);
+    // Under 600 px the tool column shows icons only (labels stay as tooltips
+    // and semantics) so 15x15 boards keep their 11 px clue font.
+    final iconTools = size.width < kCompactIconToolsMaxWidth;
+    final rightW = iconTools ? 64.0 : (size.width * 0.21).clamp(124.0, 150.0);
     return Padding(
       padding: const EdgeInsets.all(8),
       child: Row(
@@ -1951,7 +1964,7 @@ class _GameScreenState extends State<GameScreen>
           SizedBox(
             key: const Key('compact-tools'),
             width: rightW,
-            child: _compactToolPanel(p),
+            child: _compactToolPanel(p, iconOnly: iconTools),
           ),
         ],
       ),
@@ -2007,32 +2020,8 @@ class _GameScreenState extends State<GameScreen>
                   ),
                 ],
               ),
-              Center(child: _soundHelp(p)),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
-  Widget _compactToolPanel(PaperPalette p) => PaperPanel(
-    palette: p,
-    padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
-    child: LayoutBuilder(
-      builder: (context, c) => SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: c.maxHeight),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: _showWinBar
-                    ? _winBox(p, vertical: true, small: true)
-                    : _game.isWon
-                    ? const SizedBox(key: ValueKey('none'), height: 1)
-                    : _toolButtons(p, vertical: true, dense: true),
-              ),
+              // Check results and other short messages; the slim tool column
+              // has no room for text.
               if (_message != null)
                 Text(
                   _message!,
@@ -2047,12 +2036,49 @@ class _GameScreenState extends State<GameScreen>
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+              Center(child: _soundHelp(p)),
             ],
           ),
         ),
       ),
     ),
   );
+
+  Widget _compactToolPanel(PaperPalette p, {required bool iconOnly}) =>
+      PaperPanel(
+        palette: p,
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+        child: LayoutBuilder(
+          builder: (context, c) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: c.maxHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _showWinBar
+                        ? _winBox(
+                            p,
+                            vertical: true,
+                            small: true,
+                            iconOnly: iconOnly,
+                          )
+                        : _game.isWon
+                        ? const SizedBox(key: ValueKey('none'), height: 1)
+                        : _toolButtons(
+                            p,
+                            vertical: true,
+                            dense: true,
+                            iconOnly: iconOnly,
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 
   // Narrow: stacked header, board, tools. Short windows fold Daily and the
   // Levels/Album/Themes buttons into one row.

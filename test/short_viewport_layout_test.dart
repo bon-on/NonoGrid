@@ -207,4 +207,101 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
+
+  // Levels 31-200 keep the 11 px clue font (no scale-down) on the supported
+  // short landscape sizes, with the first-run strip as well from 600 px.
+  for (final size in const [
+    Size(560, 315),
+    Size(600, 338),
+    Size(620, 349),
+    Size(640, 480),
+    Size(667, 375),
+    Size(844, 390),
+  ]) {
+    testWidgets('levels 31-200 are not scaled at $size', (t) async {
+      for (var level = 31; level <= 200; level++) {
+        for (final tips in [false, true]) {
+          if (tips && level % 10 != 6) continue;
+          // The first-run strip (first session only) may scale 15x15 boards
+          // at 560x315; see feature-short-viewport-layout.
+          if (tips && size.width < 600) continue;
+          await _launch(t, size, level: level, tips: tips);
+          final rect = t.getRect(_canvas);
+          final raw = t.getSize(_canvas);
+          expect(
+            rect.width,
+            closeTo(raw.width, 0.5),
+            reason: 'level $level tips $tips scaled',
+          );
+          final m =
+              (t.widget<CustomPaint>(_canvas).painter! as BoardPainter).metrics;
+          expect(m.font, greaterThanOrEqualTo(BoardMetrics.minFont));
+          expect(t.takeException(), isNull);
+        }
+      }
+    });
+  }
+
+  testWidgets('taps hit the right cell on a scaled-down board', (t) async {
+    // 320x568 with the strip is the one listed size where a 15x15 board
+    // falls back to the FittedBox scale-down.
+    await _launch(t, const Size(320, 568), level: 60, tips: true);
+    final rect = t.getRect(_canvas);
+    final raw = t.getSize(_canvas);
+    expect(raw.width, greaterThan(rect.width + 1), reason: 'expected scaling');
+    final m = (t.widget<CustomPaint>(_canvas).painter! as BoardPainter).metrics;
+    final scale = rect.width / raw.width;
+    Offset centre(int r, int c) =>
+        rect.topLeft +
+        (m.gridOrigin + Offset((c + 0.5) * m.cell, (r + 0.5) * m.cell)) * scale;
+    final game = t.widget<NonoBoard>(find.byType(NonoBoard)).game;
+    for (final (r, c) in const [(14, 14), (3, 7), (0, 0)]) {
+      await t.tapAt(centre(r, c));
+      await t.pump();
+      expect(game.at(r, c), Mark.filled, reason: 'cell $r,$c');
+    }
+    var filled = 0;
+    for (var i = 0; i < game.size * game.size; i++) {
+      if (game.at(i ~/ game.size, i % game.size) == Mark.filled) filled++;
+    }
+    expect(filled, 3, reason: 'no neighbour cell was filled');
+  });
+
+  testWidgets('icon-only buttons keep labels as semantics and tooltips', (
+    t,
+  ) async {
+    final handle = t.ensureSemantics();
+    await _launch(t, const Size(560, 315));
+    for (final label in [
+      'Levels',
+      'Album',
+      'Themes',
+      'Fill',
+      'Mark X',
+      'Undo',
+      'Logic hint',
+      'Check',
+      'Restart',
+    ]) {
+      expect(find.bySemanticsLabel(label), findsOneWidget, reason: label);
+      expect(find.byTooltip(label), findsOneWidget, reason: label);
+    }
+    handle.dispose();
+  });
+
+  testWidgets('compact icon tools show Check messages and the win box', (
+    t,
+  ) async {
+    await _launch(t, const Size(560, 315));
+    await t.tap(find.byKey(const Key('tool-fill')));
+    await t.pump();
+    // Check on an empty board reports in the info panel.
+    await t.tap(find.byTooltip('Check'));
+    await t.pump();
+    final msg = find.byKey(const Key('panel-hint'));
+    expect(msg, findsOneWidget);
+    _expectInside(t.getRect(msg), const Size(560, 315), 'message');
+    expect(t.takeException(), isNull);
+    await t.pump(const Duration(seconds: 2));
+  });
 }

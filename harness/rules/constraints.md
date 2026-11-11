@@ -20,7 +20,8 @@
 - Layout must fit 390x844 portrait and 1280x720 landscape without overflow;
   clue font never below 11 logical px. Short portal iframes (620x349 GamePix
   "Small" preview, 640x480 minimum, down to 560x315) must keep the board
-  first and playable (`feature-short-viewport-layout`).
+  first and playable (`feature-short-viewport-layout`, which lists the one
+  accepted board scale-down while the first-run tips show).
 - Do not use third-party trademarked names for the genre; call it nonogram.
 - Never commit secrets, `.env` files, personal absolute paths or emails.
 - Before claiming completion run `flutter analyze`, `flutter test` and

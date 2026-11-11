@@ -39,7 +39,11 @@ Layout selection (`screenLayoutFor`)
   as one row of icon buttons with tooltips and semantics labels, XP, sound
   and "?"), the board in the middle with all remaining width and height, and
   a slim tool column (dense Fill, Mark X, Undo, Logic hint, Check, Restart;
-  messages below them; the win box when solved). No key hint text.
+  the win box when solved). Below 600 px width the tool column shows icons
+  only (labels stay as tooltips and semantics labels) and the win box shows
+  the time and an icon Next button, so 15x15 boards keep their clue font.
+  Check and other short messages appear in the info column. No key hint
+  text.
 - `stacked` (unchanged arrangement) for portrait and square windows. Below
   700 px height it folds the Daily card and the Levels/Album/Themes icon
   buttons into one row and shows Undo, Check and Restart as icon buttons.
@@ -50,7 +54,10 @@ Layout selection (`screenLayoutFor`)
 Board fit
 - The board canvas is scaled down (FittedBox) only when its minimum size
   (8 px cells, 11 px clue font) does not fit its box, so it never paints over
-  neighbouring controls. At the supported sizes it is not scaled.
+  neighbouring controls; pointer input follows the scale. At the supported
+  sizes it is not scaled, with one accepted exception: while the first-run
+  tip strip is shown (first session only, before the tutorial flag is
+  stored) a 12x12 or 15x15 board may scale down at 560x315 and 320x568.
 
 First-run coach
 - The tip strip stays above the board in every layout and never overlaps it.
@@ -79,6 +86,14 @@ portal websites, new dependencies.
 - 15x15 boards (level 60) with the strip at 620x349, 600x338, 560x315,
   640x480, 667x375, 844x390 and 320x568: no overlap, canvas inside its box,
   at least 150 px tall (scaled down if needed).
+- Levels 31-200 at 560x315, 600x338, 620x349, 640x480, 667x375 and 844x390
+  are never scaled and keep the clue font at 11 px or more (with the strip
+  too from 600 px width).
+- On a scaled-down board (320x568, level 60, strip shown) taps on cells
+  (14,14), (3,7) and (0,0) fill exactly those cells.
+- Icon-only buttons expose Levels, Album, Themes, Fill, Mark X, Undo,
+  Logic hint, Check and Restart as semantics labels and tooltips at 560x315;
+  a Check message appears on screen there.
 - Levels, Album, Themes and Daily overlays open from the compact panel at
   620x349 and 560x315 without overflow.
 - Existing tests keep passing (390x844, 844x390, 1280x720, 320x640 strip and
@@ -95,7 +110,7 @@ portal websites, new dependencies.
 ## Constraints
 - No new dependency; no change to game rules, saves, generators or dailies.
 - Clue font never below 11 px at the supported sizes (the FittedBox fallback
-  only applies below them).
+  only applies below them, apart from the first-run strip exception above).
 - Icon-only buttons keep their label as tooltip and semantics label.
 
 ## Evidence

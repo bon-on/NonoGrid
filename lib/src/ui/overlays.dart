@@ -906,7 +906,7 @@ class LevelMapOverlay extends StatelessWidget {
     // header and page buttons stay on screen.
     final mapH = screen.height >= 410
         ? (screen.height - 210).clamp(200.0, 330.0)
-        : math.max(120.0, screen.height - 190);
+        : math.max(120.0, math.min(200.0, screen.height - 190));
     return OverlayFrame(
       palette: p,
       maxWidth: 560,
