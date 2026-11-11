@@ -82,7 +82,9 @@ pressed before closing. Album/map thumbnails show the assigned puzzle.
 
 Starting a stroke on a cell that already has the current mark erases that
 mark along the stroke instead. **Check** briefly highlights wrong fills; there
-is no penalty beyond the star (free mode). The timer starts on your first move and best times
+is no penalty beyond the star (free mode). **Logic hint** explains the next cell that
+the clues force (and why) and applies it only when you press Apply step; it
+does not cost stars or XP. The timer starts on your first move and best times
 are kept per level.
 
 The first launch shows three short tips in a strip above the board (they

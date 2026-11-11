@@ -35,6 +35,7 @@ fonts, relative base, no `crazygames-sdk`, no `bon-on.github.io`, no external
 | Desktop / Mobile friendly | both (mouse, touch and keyboard) |
 | SDK integration | none |
 | Language | English |
+| Description / controls | see `reports/store-listing-2026-11.md` (same texts as CrazyGames) |
 
 ## Saved progress
 

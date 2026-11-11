@@ -86,19 +86,39 @@ stays in browser localStorage only.
 Nothing needs disabling: the game has no ads, no leaderboard or result upload and no
 hub navigation bar, and `index.html` contains no outbound links.
 
+## Store listing
+
+Use these texts on the submission page (final copy and fact check:
+`reports/store-listing-2026-11.md`). Do not describe the puzzles as
+hand-made pictures or pixel art: new levels are randomly generated.
+
+Description:
+
+```text
+NonoGrid is a calm nonogram logic puzzle. Fill cells so every row and column matches its number clues. Puzzles are freshly generated for each level, grow from 5x5 to 15x15 and always have one solution you can reach by logic alone, with no guessing. Play the Daily puzzle to build a streak, earn up to 3 stars per level, collect your solved grids in color in album sets and unlock paper themes as you level up. Stuck? A Logic hint explains the next forced step.
+```
+
+Controls:
+
+```text
+Mouse or touch: tap or drag to fill cells; switch to Mark X, or right-click, to mark empty cells. Keyboard: arrow keys move the cursor, Space fills, X marks, U undoes, R restarts, Enter opens the next puzzle after a win and D opens the Daily puzzle. Check shows wrong fills; Logic hint explains the next step.
+```
+
 ## Upload checklist
 
 - [ ] Submit through Basic Launch first (ads are not allowed there).
 - [ ] Orientation: portrait and landscape both work; the board fits any size.
 - [ ] Input: mouse/touch and keyboard (see README).
-- [ ] Prepared covers: 1920x1080, 800x1200, 800x800.
+- [ ] Prepared covers: 1920x1080, 800x1200, 800x800 from `../_marketing/NonoGrid/covers_v3/` (rebuild with
+      `source/render.sh`, which also verifies every clue against the drawn cells).
+- [ ] Description and controls from the Store listing section above.
 - [ ] Check loading and gameplay events in the portal QA tool.
 - [ ] Progress Save: set to "Yes, using the Data Module from the CrazyGames SDK".
 - [ ] In portal QA: solve the daily, check the streak survives a reload and a second device (logged in), and try Copy result.
 
 ## Launch verification — 2026-11-06
 
-- Covers are maintained in the workspace marketing folder (`../_marketing/NonoGrid/crazygames-launch/`) in landscape 1920x1080, portrait 800x1200 and square 800x800 sizes.
+- Covers are maintained in the workspace marketing folder (`../_marketing/NonoGrid/crazygames-launch/`) in landscape 1920x1080, portrait 800x1200 and square 800x800 sizes. Superseded on 2026-11-11 by `../_marketing/NonoGrid/covers_v3/`: the launch landscape heart had clues that did not match its cells.
 - Backgrounding or losing focus pauses SDK gameplay and sound; resume starts gameplay only if no tutorial/menu/result is open. Repeated lifecycle transitions do not duplicate events.
 - Local automated SDK tests use a fake SDK. Final portal QA must still confirm the real uploaded build's loading, inputs, audio mute and account progress persistence.
 - The self-contained release packet is prepared at `../_marketing/crazygames-launch-2026-11-06/NonoGrid/` (ZIP, media and submission metadata). Portal upload and real QA are pending authenticated portal access.
