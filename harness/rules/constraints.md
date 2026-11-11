@@ -18,7 +18,9 @@
   tweak rule changes existing levels and needs an ADR update.
 - Puzzle randomness uses `SeededRng` (xorshift32), never `dart:math` `Random`.
 - Layout must fit 390x844 portrait and 1280x720 landscape without overflow;
-  clue font never below 11 logical px.
+  clue font never below 11 logical px. Short portal iframes (620x349 GamePix
+  "Small" preview, 640x480 minimum, down to 560x315) must keep the board
+  first and playable (`feature-short-viewport-layout`).
 - Do not use third-party trademarked names for the genre; call it nonogram.
 - Never commit secrets, `.env` files, personal absolute paths or emails.
 - Before claiming completion run `flutter analyze`, `flutter test` and

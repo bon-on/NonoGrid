@@ -44,6 +44,43 @@ bool _isBrowserShortcut(KeyEvent e) {
 /// Tool panel height below which the key hint is left out.
 const double _kHintMinPanelHeight = 440;
 
+/// How the game screen is arranged for a window size
+/// (feature-short-viewport-layout).
+enum ScreenLayout {
+  /// Portrait and square windows: header, board, tools stacked.
+  stacked,
+
+  /// Short landscape windows (portal previews, phones on their side) that
+  /// are too narrow for [wide]: compact info column, board, tool column.
+  compact,
+
+  /// Wide landscape windows: info panel, board, tool panel.
+  wide,
+}
+
+/// Height under which a landscape window that is not [ScreenLayout.wide]
+/// switches to [ScreenLayout.compact]; the stacked header and tool rows
+/// would leave the board too little height there.
+const double kCompactMaxHeight = 560;
+
+/// Stacked windows shorter than this fold Daily, Levels, Album and Themes
+/// into a single row so the board keeps its height.
+const double kFoldedMetaMaxHeight = 700;
+
+ScreenLayout screenLayoutFor(Size size) {
+  if (size.width >= 700 && size.width > size.height * 1.3) {
+    return ScreenLayout.wide;
+  }
+  if (size.width > size.height && size.height < kCompactMaxHeight) {
+    return ScreenLayout.compact;
+  }
+  return ScreenLayout.stacked;
+}
+
+/// Info panel height below which Levels/Album/Themes become an icon row
+/// under the Daily card instead of labelled buttons at the bottom.
+const double _kMetaRowMaxPanelHeight = 600;
+
 /// Overlays other than the tutorial.
 enum _Panel { none, summary, album, levels, themes, logic, daily }
 
@@ -406,11 +443,16 @@ class _GameScreenState extends State<GameScreen>
 
   bool get _showCoach => _coach.visible && _tutorialChecked && !_game.isWon;
 
-  Widget _coachStrip(PaperPalette p, {required bool pointer}) => CoachStrip(
+  Widget _coachStrip(
+    PaperPalette p, {
+    required bool pointer,
+    int maxLines = 3,
+  }) => CoachStrip(
     palette: p,
     step: _coach.step,
     text: coachText(_coach.step, fullLine: _fullLine, pointer: pointer),
     onDismiss: _dismissCoach,
+    maxLines: maxLines,
   );
 
   /// Pauses the clock for an overlay. Call inside setState.
@@ -1075,7 +1117,8 @@ class _GameScreenState extends State<GameScreen>
   Widget build(BuildContext context) {
     final p = _palette;
     final size = MediaQuery.sizeOf(context);
-    final wide = size.width >= 700 && size.width > size.height * 1.3;
+    final layout = screenLayoutFor(size);
+    final wide = layout == ScreenLayout.wide;
     return Focus(
       focusNode: _focus,
       autofocus: true,
@@ -1090,7 +1133,13 @@ class _GameScreenState extends State<GameScreen>
                 Positioned.fill(
                   child: DeskScenery(palette: p, showProps: wide),
                 ),
-                SafeArea(child: wide ? _wideLayout(p, size) : _narrowLayout(p)),
+                SafeArea(
+                  child: switch (layout) {
+                    ScreenLayout.wide => _wideLayout(p, size),
+                    ScreenLayout.compact => _compactLayout(p, size),
+                    ScreenLayout.stacked => _narrowLayout(p, size),
+                  },
+                ),
                 ..._overlays(p),
               ],
             ),
@@ -1288,8 +1337,13 @@ class _GameScreenState extends State<GameScreen>
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
+              // Bottom-up so the strip paints over the board card's tape.
               child: Column(
+                verticalDirection: VerticalDirection.up,
                 children: [
+                  Expanded(child: _board(p)),
+                  // Room for the board card's tape, drawn above the card.
+                  if (_showCoach) const SizedBox(height: 10),
                   if (_showCoach)
                     Center(
                       child: ConstrainedBox(
@@ -1297,9 +1351,6 @@ class _GameScreenState extends State<GameScreen>
                         child: _coachStrip(p, pointer: true),
                       ),
                     ),
-                  // Room for the board card's tape, drawn above the card.
-                  if (_showCoach) const SizedBox(height: 10),
-                  Expanded(child: _board(p)),
                 ],
               ),
             ),
@@ -1423,7 +1474,7 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _timeBlock(PaperPalette p, {required bool big}) {
+  Widget _timeBlock(PaperPalette p, {required bool big, bool small = false}) {
     final best = _dailyDay != null ? null : _storage.bestSeconds(_level);
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1435,7 +1486,7 @@ class _GameScreenState extends State<GameScreen>
           formatTime(_elapsed),
           style: TextStyle(
             color: p.panelText,
-            fontSize: big ? 30 : 18,
+            fontSize: small ? 20 : (big ? 30 : 18),
             fontWeight: FontWeight.w900,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
@@ -1548,7 +1599,11 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  List<Widget> _metaButtons(PaperPalette p, {required bool expand}) => [
+  List<Widget> _metaButtons(
+    PaperPalette p, {
+    required bool expand,
+    bool iconOnly = false,
+  }) => [
     PaperButton(
       key: const Key('open-levels'),
       palette: p,
@@ -1556,6 +1611,7 @@ class _GameScreenState extends State<GameScreen>
       icon: Icons.map_outlined,
       compact: true,
       expand: expand,
+      iconOnly: iconOnly,
       onPressed: () => _openPanel(_Panel.levels),
     ),
     PaperButton(
@@ -1565,6 +1621,7 @@ class _GameScreenState extends State<GameScreen>
       icon: Icons.photo_library_outlined,
       compact: true,
       expand: expand,
+      iconOnly: iconOnly,
       onPressed: () => _openPanel(_Panel.album),
     ),
     PaperButton(
@@ -1574,9 +1631,20 @@ class _GameScreenState extends State<GameScreen>
       icon: Icons.palette_outlined,
       compact: true,
       expand: expand,
+      iconOnly: iconOnly,
       onPressed: () => _openPanel(_Panel.themes),
     ),
   ];
+
+  /// Levels, Album and Themes as one row of icon buttons.
+  Widget _metaIconRow(PaperPalette p) => Row(
+    children: [
+      for (final b in _metaButtons(p, expand: true, iconOnly: true)) ...[
+        Expanded(child: b),
+        const SizedBox(width: 4),
+      ],
+    ]..removeLast(),
+  );
 
   Widget _dailyCard(PaperPalette p, {required bool compact}) => DailyCard(
     palette: p,
@@ -1612,14 +1680,22 @@ class _GameScreenState extends State<GameScreen>
               const SizedBox(height: 10),
               // Kept high so short landscape screens show it unscrolled.
               _dailyCard(p, compact: c.maxHeight < 520),
+              // Short panels lift Levels/Album/Themes next to Daily as icon
+              // buttons so every menu stays reachable without scrolling.
+              if (c.maxHeight < _kMetaRowMaxPanelHeight) ...[
+                const SizedBox(height: 8),
+                _metaIconRow(p),
+              ],
               const SizedBox(height: 12),
               _goals(p),
               const SizedBox(height: 14),
               _xpBlock(p),
-              const SizedBox(height: 16),
-              for (final b in _metaButtons(p, expand: true)) ...[
-                b,
-                const SizedBox(height: 8),
+              if (c.maxHeight >= _kMetaRowMaxPanelHeight) ...[
+                const SizedBox(height: 16),
+                for (final b in _metaButtons(p, expand: true)) ...[
+                  b,
+                  const SizedBox(height: 8),
+                ],
               ],
             ],
           ),
@@ -1656,6 +1732,7 @@ class _GameScreenState extends State<GameScreen>
     PaperPalette p, {
     required bool vertical,
     bool dense = false,
+    bool slim = false,
   }) {
     final items = <Widget>[
       PaperButton(
@@ -1681,6 +1758,7 @@ class _GameScreenState extends State<GameScreen>
       PaperButton(
         palette: p,
         label: 'Undo',
+        iconOnly: slim,
         icon: Icons.undo_rounded,
         compact: true,
         expand: vertical,
@@ -1698,6 +1776,7 @@ class _GameScreenState extends State<GameScreen>
       PaperButton(
         palette: p,
         label: 'Check',
+        iconOnly: slim,
         icon: Icons.fact_check_outlined,
         compact: true,
         expand: vertical,
@@ -1706,6 +1785,7 @@ class _GameScreenState extends State<GameScreen>
       PaperButton(
         palette: p,
         label: 'Restart',
+        iconOnly: slim,
         icon: Icons.refresh_rounded,
         compact: true,
         expand: vertical,
@@ -1732,17 +1812,17 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _winBox(PaperPalette p, {required bool vertical}) {
+  Widget _winBox(PaperPalette p, {required bool vertical, bool small = false}) {
     final best = _dailyDay != null ? null : _storage.bestSeconds(_level);
     final text = Text(
       '$_levelTitle! Solved in ${formatTime(_elapsed)}'
       '${best != null ? '  Best ${formatTime(best)}' : ''}',
       textAlign: vertical ? TextAlign.center : TextAlign.start,
-      maxLines: 2,
+      maxLines: small ? 4 : 2,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: p.panelText,
-        fontSize: 15,
+        fontSize: small ? 13 : 15,
         fontWeight: FontWeight.w800,
       ),
     );
@@ -1846,8 +1926,138 @@ class _GameScreenState extends State<GameScreen>
     ),
   );
 
-  // Narrow: stacked header, board, tools.
-  Widget _narrowLayout(PaperPalette p) {
+  // Compact: short landscape windows (portal previews such as 620x349, phones
+  // on their side). Board first: slim info column, board, slim tool column.
+  Widget _compactLayout(PaperPalette p, Size size) {
+    final leftW = (size.width * 0.27).clamp(160.0, 190.0);
+    final rightW = (size.width * 0.21).clamp(124.0, 150.0);
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            key: const Key('compact-info'),
+            width: leftW,
+            child: _compactInfoPanel(p),
+          ),
+          Expanded(
+            child: _stripOverBoard(
+              p,
+              stripPadding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
+              board: _board(p),
+            ),
+          ),
+          SizedBox(
+            key: const Key('compact-tools'),
+            width: rightW,
+            child: _compactToolPanel(p),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The first-run tip strip above the board. Laid out bottom-up so the strip
+  /// paints after the board: the card's tape tucks under the strip instead
+  /// of covering its edge, without spending board height on a tape gap.
+  Widget _stripOverBoard(
+    PaperPalette p, {
+    required EdgeInsets stripPadding,
+    required Widget board,
+  }) => Column(
+    verticalDirection: VerticalDirection.up,
+    children: [
+      Expanded(child: board),
+      if (_showCoach)
+        Padding(padding: stripPadding, child: _coachStrip(p, pointer: false)),
+    ],
+  );
+
+  Widget _compactInfoPanel(PaperPalette p) => PaperPanel(
+    palette: p,
+    padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
+    child: LayoutBuilder(
+      builder: (context, c) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: c.maxHeight),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _levelNav(p, big: false),
+                  Center(child: _timeBlock(p, big: true, small: true)),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _dailyCard(p, compact: true),
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _metaIconRow(p),
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: _xpBlock(p),
+                  ),
+                ],
+              ),
+              Center(child: _soundHelp(p)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _compactToolPanel(PaperPalette p) => PaperPanel(
+    palette: p,
+    padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+    child: LayoutBuilder(
+      builder: (context, c) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: c.maxHeight),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: _showWinBar
+                    ? _winBox(p, vertical: true, small: true)
+                    : _game.isWon
+                    ? const SizedBox(key: ValueKey('none'), height: 1)
+                    : _toolButtons(p, vertical: true, dense: true),
+              ),
+              if (_message != null)
+                Text(
+                  _message!,
+                  key: const Key('panel-hint'),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: p.accent,
+                    fontSize: 13,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  // Narrow: stacked header, board, tools. Short windows fold Daily and the
+  // Levels/Album/Themes buttons into one row.
+  Widget _narrowLayout(PaperPalette p, Size size) {
+    final folded = size.height < kFoldedMetaMaxHeight;
     return Column(
       children: [
         Padding(
@@ -1882,31 +2092,43 @@ class _GameScreenState extends State<GameScreen>
           ),
         ),
         const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            children: [
-              for (final b in _metaButtons(p, expand: true)) ...[
-                Expanded(child: b),
-                const SizedBox(width: 6),
-              ],
-            ]..removeLast(),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: _dailyCard(p, compact: true),
-        ),
-        if (_showCoach)
+        if (folded)
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
-            child: _coachStrip(p, pointer: false),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                Expanded(child: _dailyCard(p, compact: true)),
+                const SizedBox(width: 6),
+                SizedBox(width: 132, child: _metaIconRow(p)),
+              ],
+            ),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                for (final b in _metaButtons(p, expand: true)) ...[
+                  Expanded(child: b),
+                  const SizedBox(width: 6),
+                ],
+              ]..removeLast(),
+            ),
           ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: _dailyCard(p, compact: true),
+          ),
+        ],
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-            child: _board(p),
+          child: _stripOverBoard(
+            p,
+            stripPadding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+            board: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+              child: _board(p),
+            ),
           ),
         ),
         SizedBox(
@@ -1934,7 +2156,7 @@ class _GameScreenState extends State<GameScreen>
                   )
                 : _game.isWon
                 ? const SizedBox(key: ValueKey('none'), height: 1)
-                : _toolButtons(p, vertical: false),
+                : _toolButtons(p, vertical: false, slim: folded),
           ),
         ),
         const SizedBox(height: 8),

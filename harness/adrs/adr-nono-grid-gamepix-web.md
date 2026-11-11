@@ -7,6 +7,7 @@ related_specs:
   - feature-nono-grid-gamepix
   - feature-retention-polish
   - feature-portal-quality-pass
+  - feature-short-viewport-layout
 ---
 
 # ADR: Select the GamePix build with a GAMEPIX flag and the no-op platform

@@ -9,6 +9,7 @@ related_specs:
   - feature-retention-polish
   - feature-crazygames-cloud-save
   - feature-portal-quality-pass
+  - feature-short-viewport-layout
 ---
 
 # ADR: Use a build flag and a platform adapter for the CrazyGames build

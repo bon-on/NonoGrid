@@ -146,40 +146,47 @@ class _NonoBoardState extends State<NonoBoard> {
             maxDigits: maxDigits,
             space: constraints.biggest,
           );
+          // Tiny spaces (very short windows, big boards) cannot keep the
+          // minimum clue font and cell size; scale the whole board down so
+          // it never paints past its box onto neighbouring controls.
           return Center(
-            child: Listener(
-              onPointerDown: (e) {
-                if (_pointer != null) return;
-                final (r, c) = _cellAt(m, e.localPosition);
-                if (!widget.game.inBounds(r, c)) return;
-                _pointer = e.pointer;
-                final secondary =
-                    e.kind == PointerDeviceKind.mouse &&
-                    (e.buttons & kSecondaryMouseButton) != 0;
-                widget.onStrokeStart(
-                  r,
-                  c,
-                  secondary ? Tool.cross : widget.tool,
-                );
-              },
-              onPointerMove: (e) {
-                if (e.pointer != _pointer) return;
-                final (r, c) = _cellAt(m, e.localPosition);
-                widget.onStrokeMove(r, c);
-              },
-              onPointerUp: (e) => _end(e.pointer),
-              onPointerCancel: (e) => _end(e.pointer),
-              child: CustomPaint(
-                size: m.size,
-                painter: BoardPainter(
-                  game: widget.game,
-                  metrics: m,
-                  palette: widget.palette,
-                  picture: widget.picture,
-                  cursor: widget.showCursor ? widget.cursor : null,
-                  reveal: widget.reveal,
-                  mistakes: widget.mistakes,
-                  fx: widget.fx,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Listener(
+                onPointerDown: (e) {
+                  if (_pointer != null) return;
+                  final (r, c) = _cellAt(m, e.localPosition);
+                  if (!widget.game.inBounds(r, c)) return;
+                  _pointer = e.pointer;
+                  final secondary =
+                      e.kind == PointerDeviceKind.mouse &&
+                      (e.buttons & kSecondaryMouseButton) != 0;
+                  widget.onStrokeStart(
+                    r,
+                    c,
+                    secondary ? Tool.cross : widget.tool,
+                  );
+                },
+                onPointerMove: (e) {
+                  if (e.pointer != _pointer) return;
+                  final (r, c) = _cellAt(m, e.localPosition);
+                  widget.onStrokeMove(r, c);
+                },
+                onPointerUp: (e) => _end(e.pointer),
+                onPointerCancel: (e) => _end(e.pointer),
+                child: CustomPaint(
+                  key: const Key('board-canvas'),
+                  size: m.size,
+                  painter: BoardPainter(
+                    game: widget.game,
+                    metrics: m,
+                    palette: widget.palette,
+                    picture: widget.picture,
+                    cursor: widget.showCursor ? widget.cursor : null,
+                    reveal: widget.reveal,
+                    mistakes: widget.mistakes,
+                    fx: widget.fx,
+                  ),
                 ),
               ),
             ),

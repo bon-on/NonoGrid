@@ -2,7 +2,7 @@
 
 Project-owned. Add instructions specific to this repository here, such as operational cautions, domain rules or verification notes that do not fit a spec, ADR or rule file. harness-lab creates this file once and never replaces your edits; keep `AGENTS.md`, `CLAUDE.md` and `harness/workflow.md` identical to the template so `harness-lab update` can refresh them.
 
-- Active specs: `harness/specs/feature-portal-quality-pass.md`, `harness/specs/feature-daily-puzzle.md` and `harness/specs/feature-collection-sets.md`
+- Active specs: `harness/specs/feature-short-viewport-layout.md`, `harness/specs/feature-portal-quality-pass.md`, `harness/specs/feature-daily-puzzle.md` and `harness/specs/feature-collection-sets.md`
   (retention baseline: `harness/specs/feature-retention-polish.md`, MVP baseline: `harness/specs/feature-nono-grid-mvp.md`).
 - Daily puzzles derive from the local calendar date (`adr-daily-puzzle`); changing `dailySeed`/`dailySize`
   changes every past and future daily.

@@ -81,6 +81,7 @@ class PaperButton extends StatefulWidget {
     this.primary = false,
     this.compact = false,
     this.expand = false,
+    this.iconOnly = false,
   });
 
   final PaperPalette palette;
@@ -98,6 +99,10 @@ class PaperButton extends StatefulWidget {
   /// Fill the available width.
   final bool expand;
 
+  /// Show only [icon]; [label] becomes the tooltip and semantics label.
+  /// Used where space is short (short landscape layouts).
+  final bool iconOnly;
+
   @override
   State<PaperButton> createState() => _PaperButtonState();
 }
@@ -113,34 +118,42 @@ class _PaperButtonState extends State<PaperButton> {
     final bg = filled ? p.accent : p.panel;
     final fg = filled ? p.accentInk : p.panelText;
     final depth = _down || !enabled ? 1.0 : 3.0;
-    final content = Row(
-      mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (widget.icon != null) ...[
-          Icon(widget.icon, size: widget.compact ? 17 : 19, color: fg),
-          const SizedBox(width: 6),
-        ],
-        Flexible(
-          child: Text(
-            widget.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: fg,
-              fontSize: widget.compact ? 13 : 15,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ),
-      ],
-    );
-    return Opacity(
+    final iconOnly = widget.iconOnly && widget.icon != null;
+    final Widget content = iconOnly
+        ? Center(
+            widthFactor: widget.expand ? null : 1,
+            heightFactor: 1,
+            child: Icon(widget.icon, size: 19, color: fg),
+          )
+        : Row(
+            mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (widget.icon != null) ...[
+                Icon(widget.icon, size: widget.compact ? 17 : 19, color: fg),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: widget.compact ? 13 : 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ],
+          );
+    final button = Opacity(
       opacity: enabled ? 1 : 0.45,
       child: Semantics(
         button: true,
         selected: widget.selected,
+        label: iconOnly ? widget.label : null,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapDown: enabled ? (_) => setState(() => _down = true) : null,
@@ -170,6 +183,13 @@ class _PaperButtonState extends State<PaperButton> {
         ),
       ),
     );
+    return iconOnly
+        ? Tooltip(
+            message: widget.label,
+            excludeFromSemantics: true,
+            child: button,
+          )
+        : button;
   }
 }
 

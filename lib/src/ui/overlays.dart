@@ -902,7 +902,11 @@ class LevelMapOverlay extends StatelessWidget {
     // One page of locked levels past the newest unlocked one is browsable.
     final maxPage = (unlocked - 1) ~/ kMapPageSize + 1;
     final screen = MediaQuery.sizeOf(context);
-    final mapH = (screen.height - 210).clamp(200.0, 330.0);
+    // Short windows (portal previews such as 560x315) shrink the map so the
+    // header and page buttons stay on screen.
+    final mapH = screen.height >= 410
+        ? (screen.height - 210).clamp(200.0, 330.0)
+        : math.max(120.0, screen.height - 190);
     return OverlayFrame(
       palette: p,
       maxWidth: 560,

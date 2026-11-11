@@ -6,6 +6,7 @@ related_specs:
   - feature-daily-puzzle
   - feature-nono-grid-gamepix
   - feature-portal-quality-pass
+  - feature-short-viewport-layout
 evidence_files:
   - docs/gamepix.md
   - reports/nono-grid-gamepix-verification.md
