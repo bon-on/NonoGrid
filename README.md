@@ -85,7 +85,10 @@ mark along the stroke instead. **Check** briefly highlights wrong fills; there
 is no penalty beyond the star (free mode). **Logic hint** explains the next cell that
 the clues force (and why) and applies it only when you press Apply step; it
 does not cost stars or XP. The timer starts on your first move and best times
-are kept per level.
+are kept per level. When a move makes a row or column match its clue, the
+empty cells of that line are crossed for you (the same Undo step reverts
+both). On phones a finished line, an overfilled line and a win also vibrate
+(off while sound is muted; `feature-line-assist`).
 
 The first launch shows three short tips in a strip above the board (they
 never block play and advance as you fill, mark and finish lines; the close

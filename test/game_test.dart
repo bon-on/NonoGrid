@@ -101,8 +101,9 @@ void main() {
     }
     expect(g.isWon, isTrue);
     // Input is ignored after the win.
+    final after = g.encode();
     g.tap(0, 0, Tool.fill);
-    expect(g.at(0, 0), Mark.empty);
+    expect(g.encode(), after);
     expect(g.undo(), isFalse);
   });
 
@@ -138,5 +139,104 @@ void main() {
     expect(g.undo(), isFalse); // stroke ends, puzzle won, undo refused
     expect(g.isWon, isTrue);
     expect(g.matchesClues, isTrue);
+  });
+
+  group('auto-cross finished lines', () {
+    // Heart: row 1 '#####' (clue [5]), column 0 '.##..' (clue [2]).
+    test('crosses the empty cells of a line that newly matches its clue', () {
+      final g = _game();
+      g.tap(1, 0, Tool.fill);
+      g.tap(2, 0, Tool.fill); // column 0 now matches [2]
+      expect(g.at(0, 0), Mark.crossed);
+      expect(g.at(3, 0), Mark.crossed);
+      expect(g.at(4, 0), Mark.crossed);
+      // Row 1 has other empty cells and is not finished.
+      expect(g.at(1, 1), Mark.empty);
+    });
+
+    test('finishing a line and its crosses undo as one step', () {
+      final g = _game();
+      g.tap(0, 1, Tool.fill);
+      g.tap(0, 3, Tool.fill);
+      g.tap(1, 3, Tool.fill);
+      final before = g.encode();
+      g.beginStroke(1, 0, Tool.fill);
+      g.updateStroke(1, 4);
+      g.endStroke(); // row 1 done
+      expect(g.rowSatisfied(1), isTrue);
+      expect(g.undo(), isTrue);
+      expect(g.encode(), before);
+    });
+
+    test('keeps fills and existing crosses', () {
+      final g = _game();
+      g.tap(3, 0, Tool.cross);
+      g.tap(1, 0, Tool.fill);
+      g.tap(2, 0, Tool.fill);
+      expect(g.at(3, 0), Mark.crossed);
+      expect(g.at(1, 0), Mark.filled);
+      expect(g.at(2, 0), Mark.filled);
+    });
+
+    test('a line that already matched is not crossed again', () {
+      final g = _game();
+      g.tap(1, 0, Tool.fill);
+      g.tap(2, 0, Tool.fill); // column 0 finished, (0,0) crossed
+      g.tap(0, 0, Tool.cross); // player clears the auto cross
+      expect(g.at(0, 0), Mark.empty);
+      g.tap(4, 4, Tool.fill); // unrelated action
+      expect(g.at(0, 0), Mark.empty);
+      expect(g.colSatisfied(0), isTrue);
+    });
+
+    test('a line with an empty clue is never crossed', () {
+      final g = NonoGame(
+        Puzzle.fromPicture(9, 'Gap', [
+          '#....',
+          '.....',
+          '.....',
+          '.....',
+          '.....',
+        ]),
+      );
+      g.tap(2, 2, Tool.fill);
+      g.tap(2, 2, Tool.fill); // fill then erase inside empty-clue lines
+      expect(g.cells.where((m) => m == Mark.crossed), isEmpty);
+    });
+
+    test('nothing is crossed once the puzzle is won', () {
+      final g = _game();
+      final p = g.puzzle;
+      for (var r = 0; r < 5; r++) {
+        for (var c = 0; c < 5; c++) {
+          if (p.filledAt(r, c)) g.tap(r, c, Tool.fill);
+        }
+      }
+      expect(g.isWon, isTrue);
+      // Row 0 finished earlier and was crossed; the winning tap adds none.
+      final crossed = g.cells.where((m) => m == Mark.crossed).length;
+      g.tap(0, 0, Tool.cross);
+      expect(g.cells.where((m) => m == Mark.crossed).length, crossed);
+    });
+
+    test('misplaced ink that matches the clue is crossed; Undo restores', () {
+      final g = _game();
+      g.tap(3, 0, Tool.fill);
+      final before = g.encode();
+      g.tap(4, 0, Tool.fill); // column 0 [2] matches with rows 3 and 4
+      expect(g.colSatisfied(0), isTrue);
+      expect(g.at(0, 0), Mark.crossed);
+      expect(g.at(1, 0), Mark.crossed);
+      expect(g.undo(), isTrue);
+      expect(g.encode(), before);
+    });
+
+    test('crosses are saved and restored like any cross', () {
+      final g = _game();
+      g.tap(1, 0, Tool.fill);
+      g.tap(2, 0, Tool.fill);
+      final copy = _game()..restore(g.encode());
+      expect(copy.encode(), g.encode());
+    });
   });
 }

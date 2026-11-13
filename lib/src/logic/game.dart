@@ -127,8 +127,50 @@ class NonoGame {
       for (final e in s.original.entries)
         if (cells[e.key] != e.value) _Change(e.key, e.value, cells[e.key]),
     ];
-    if (changes.isNotEmpty) _undo.add(changes);
     _checkWin();
+    if (changes.isNotEmpty) {
+      if (!_won) _autoCross(changes, s.original);
+      _undo.add(changes);
+    }
+  }
+
+  /// Crosses the empty cells of every row and column that this action made
+  /// newly match its clue, adding the crosses to [changes] (one undo step).
+  /// Uses clues only; [original] holds the pre-action state of touched cells.
+  void _autoCross(List<_Change> changes, Map<int, Mark> original) {
+    bool wasFilled(int r, int c) {
+      final i = r * size + c;
+      return (original[i] ?? cells[i]) == Mark.filled;
+    }
+
+    final lines = <List<int>>[];
+    for (var i = 0; i < size; i++) {
+      final rowClue = puzzle.clues.rows[i];
+      if (rowClue.isNotEmpty &&
+          rowSatisfied(i) &&
+          !sameRuns(
+            runsOf([for (var c = 0; c < size; c++) wasFilled(i, c)]),
+            rowClue,
+          )) {
+        lines.add([for (var c = 0; c < size; c++) i * size + c]);
+      }
+      final colClue = puzzle.clues.cols[i];
+      if (colClue.isNotEmpty &&
+          colSatisfied(i) &&
+          !sameRuns(
+            runsOf([for (var r = 0; r < size; r++) wasFilled(r, i)]),
+            colClue,
+          )) {
+        lines.add([for (var r = 0; r < size; r++) r * size + i]);
+      }
+    }
+    for (final line in lines) {
+      for (final i in line) {
+        if (cells[i] != Mark.empty) continue;
+        cells[i] = Mark.crossed;
+        changes.add(_Change(i, Mark.empty, Mark.crossed));
+      }
+    }
   }
 
   /// A single tap: a one-cell stroke.

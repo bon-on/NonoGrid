@@ -177,7 +177,8 @@ void main() {
     await t.tapAt(_lastCell(t));
     await t.pump();
     final cells = s.progress?.cells;
-    expect(cells, '${'.' * 24}#');
+    expect(cells?.endsWith('#'), isTrue);
+    expect('#'.allMatches(cells!).length, 1);
 
     await t.tap(find.byKey(const Key('how-to-play-button')));
     await t.pump();

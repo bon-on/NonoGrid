@@ -87,6 +87,9 @@ const double _kMetaRowMaxPanelHeight = 600;
 /// Overlays other than the tutorial.
 enum _Panel { none, summary, album, levels, themes, logic, daily }
 
+/// Strength of a haptic pulse.
+enum HapticKind { light, medium, heavy }
+
 /// Which rows/columns match their clue or hold more filled cells than it.
 class _LineState {
   _LineState(Puzzle puzzle, List<Mark> cells) {
@@ -117,6 +120,7 @@ class GameScreen extends StatefulWidget {
     this.platform = const NoopGamePlatform(),
     this.soundMuteStore = const SoundMuteStore(),
     this.onSfxPlayed,
+    this.onHaptic,
     this.clock = DateTime.now,
     this.copier = const ResultCopier(),
   });
@@ -137,6 +141,9 @@ class GameScreen extends StatefulWidget {
 
   /// Called for every sound that is actually played (not muted); for tests.
   final void Function(Sfx sfx)? onSfxPlayed;
+
+  /// Receives each haptic pulse instead of the device; tests inject it.
+  final void Function(HapticKind kind)? onHaptic;
 
   /// Defaults to [PrefsTutorialStore].
   final TutorialStore? tutorialStore;
@@ -327,6 +334,23 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  /// Phone vibration, skipped on web and while sound is muted.
+  void _haptic(HapticKind kind) {
+    final muted = _soundMuted || widget.platform.isAudioMuted;
+    final hook = widget.onHaptic;
+    if (hook != null) {
+      if (!muted) hook(kind);
+      return;
+    }
+    if (kIsWeb || muted) return;
+    final Future<void> pulse = switch (kind) {
+      HapticKind.light => HapticFeedback.lightImpact(),
+      HapticKind.medium => HapticFeedback.mediumImpact(),
+      HapticKind.heavy => HapticFeedback.heavyImpact(),
+    };
+    pulse.catchError((Object _) {});
+  }
+
   /// Line effects and sounds after a finished action that changed the board.
   /// Returns how many lines it celebrated.
   int _lineFeedback(List<Mark> before) {
@@ -344,6 +368,7 @@ class _GameScreenState extends State<GameScreen>
       }
       _fx.shake();
       _sfx.play(Sfx.mistake);
+      _haptic(HapticKind.medium);
       return 0;
     }
     final doneRows = now.rowsDone.difference(was.rowsDone);
@@ -359,7 +384,10 @@ class _GameScreenState extends State<GameScreen>
       _fx.lineDone(false, c);
     }
     final count = rows.length + cols.length;
-    if (count > 0) _sfx.play(Sfx.lineDone);
+    if (count > 0) {
+      _sfx.play(Sfx.lineDone);
+      _haptic(HapticKind.light);
+    }
     if (count >= 2) {
       _flash(count == 2 ? 'Double line!' : '$count lines at once!');
     }
@@ -372,6 +400,7 @@ class _GameScreenState extends State<GameScreen>
   void _playChange(List<Mark>? before, Tool tool) {
     if (_game.isWon) {
       _sfx.play(Sfx.levelClear);
+      _haptic(HapticKind.heavy);
     } else if (before != null && !listEquals(before, _game.cells)) {
       _sfx.play(tool == Tool.fill ? Sfx.fill : Sfx.mark);
       final lines = _lineFeedback(before);
@@ -805,7 +834,9 @@ class _GameScreenState extends State<GameScreen>
 
   void _onStrokeEnd() {
     if (!_game.isStroking) return;
+    final beforeEnd = List<Mark>.of(_game.cells);
     setState(_game.endStroke);
+    _cellFx(beforeEnd);
     _afterChange();
     _playChange(_strokeBefore, _strokeTool);
     _strokeBefore = null;
@@ -911,6 +942,7 @@ class _GameScreenState extends State<GameScreen>
     if (wrong.isNotEmpty) {
       _fx.shake();
       _sfx.play(Sfx.mistake);
+      _haptic(HapticKind.medium);
       _saveProgress();
     }
     _flash(

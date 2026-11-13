@@ -75,7 +75,9 @@ void main() {
     // Bottom-right cell of the grid.
     await tester.tapAt(box.bottomRight - const Offset(10, 10));
     await tester.pump();
-    expect(s.progress?.cells, '${'.' * 24}#');
+    // Auto-cross may also mark the cell's finished line, so only the fill is fixed.
+    expect(s.progress?.cells.endsWith('#'), isTrue);
+    expect('#'.allMatches(s.progress!.cells).length, 1);
     expect(find.text('Undo'), findsOneWidget);
   });
 

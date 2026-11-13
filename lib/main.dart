@@ -31,6 +31,7 @@ class NonoGridApp extends StatelessWidget {
     this.platform = const NoopGamePlatform(),
     this.soundMuteStore = const SoundMuteStore(),
     this.onSfxPlayed,
+    this.onHaptic,
     this.clock = DateTime.now,
     this.copier = const ResultCopier(),
   });
@@ -42,6 +43,7 @@ class NonoGridApp extends StatelessWidget {
   final GamePlatform platform;
   final SoundMuteStore soundMuteStore;
   final void Function(Sfx sfx)? onSfxPlayed;
+  final void Function(HapticKind kind)? onHaptic;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +63,7 @@ class NonoGridApp extends StatelessWidget {
         platform: platform,
         soundMuteStore: soundMuteStore,
         onSfxPlayed: onSfxPlayed,
+        onHaptic: onHaptic,
         clock: clock,
         copier: copier,
       ),
