@@ -70,3 +70,14 @@ The generator is unchanged. Level 1 of a new player picks among seeds
 derived from the drawn one (`friendlyFirstSeed`, feature-portal-quality-pass).
 Portal builds also run as dart2wasm; `test/web/generator_parity_test.dart`
 checks VM, dart2js and dart2wasm produce identical puzzles.
+
+## Addendum (2026-11-14): 6x6 step
+`sizeForLevel` now ramps 5x5 (levels 1-4), 6x6 (5-8), 7x7 (9-12), then unchanged
+(`feature-size-ramp-6x6`). This is a ramp change, so it is breaking for puzzles a player already
+holds. Mitigation: the size is stored per assigned level (`puzzleSizes`); levels without a stored
+size keep the previous size (`legacySizeForLevel`). Alternatives: re-sizing every level (changes
+albums, stars and saved boards), or a new level range at the end (does not help the 5-to-7 jump).
+Old clients that read a newer save ignore `puzzleSizes` and would show levels 5-8 at the old size.
+A cached older client that re-saves a newer save drops `puzzleSizes`; levels assigned in between
+then return to the old size when a newer client reopens it (a different puzzle, albums and boards
+for those levels change). Accepted: the 6x6 levels are only 5-8 and the game was just launched.

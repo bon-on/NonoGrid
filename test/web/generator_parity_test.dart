@@ -47,4 +47,4 @@ void main() {
 }
 
 const int _rngHash = 276229561;
-const int _puzzleHashAll = 939007943;
+const int _puzzleHashAll = 270885681;

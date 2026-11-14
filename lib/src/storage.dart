@@ -203,11 +203,13 @@ class NonoProgressData {
     this.theme = NonoTheme.notebook,
     this.progress,
     Map<int, int>? puzzleSeeds,
+    Map<int, int>? puzzleSizes,
     this.legacyThrough = 0,
     DailyData? daily,
     Set<int>? setsAwarded,
   }) : records = records ?? <int, LevelRecord>{},
        puzzleSeeds = puzzleSeeds ?? <int, int>{},
+       puzzleSizes = puzzleSizes ?? <int, int>{},
        daily = daily ?? DailyData(),
        setsAwarded = setsAwarded ?? <int>{};
 
@@ -218,6 +220,10 @@ class NonoProgressData {
   NonoTheme theme;
   SavedProgress? progress;
   final Map<int, int> puzzleSeeds;
+
+  /// Grid size of each assigned level, recorded when it is assigned. A level
+  /// without an entry keeps the size it had before the 6x6 step.
+  final Map<int, int> puzzleSizes;
   final int legacyThrough;
   final DailyData daily;
 
@@ -232,6 +238,7 @@ class NonoProgressData {
     'theme': theme.id,
     'legacyThrough': legacyThrough,
     'puzzleSeeds': {for (final e in puzzleSeeds.entries) '${e.key}': e.value},
+    'puzzleSizes': {for (final e in puzzleSizes.entries) '${e.key}': e.value},
     'records': {
       for (final e in records.entries)
         '${e.key}': {
@@ -293,6 +300,20 @@ class NonoProgressData {
           }
         }
       }
+      final sizes = <int, int>{};
+      final rawSizes = json['puzzleSizes'];
+      if (rawSizes is Map) {
+        for (final e in rawSizes.entries) {
+          final l = int.tryParse('${e.key}');
+          final size = e.value;
+          if (l != null &&
+              seeds.containsKey(l) &&
+              size is int &&
+              (size == sizeForLevel(l) || size == legacySizeForLevel(l))) {
+            sizes[l] = size;
+          }
+        }
+      }
       // A missing/corrupt seed cannot safely identify the board these marks
       // belong to. Keep earned meta progress, but never apply those marks to
       // a newly generated puzzle.
@@ -311,6 +332,7 @@ class NonoProgressData {
         ),
         progress: progress,
         puzzleSeeds: seeds,
+        puzzleSizes: sizes,
         legacyThrough: legacyThrough,
         daily: DailyData.parse(json['daily']),
         setsAwarded: _parseSets(json['setsAwarded']),
@@ -364,7 +386,11 @@ class NonoProgressData {
     } catch (_) {}
     var xp = 0;
     for (final level in records.keys) {
-      xp += clearXp(size: sizeForLevel(level), stars: 1, previousStars: 0);
+      xp += clearXp(
+        size: legacySizeForLevel(level),
+        stars: 1,
+        previousStars: 0,
+      );
     }
     SavedProgress? progress;
     final pLevel = readInt('progressLevel');
@@ -453,11 +479,24 @@ class GameStorage {
       final drawn = _seedSource() & 0xFFFFFFFF;
       final seed = drawn == 0 ? 1 : drawn;
       // A new player's very first puzzle gets an obvious opening move.
+      _data.puzzleSizes[level] = sizeOf(level);
       _data.puzzleSeeds[level] = level == 1 ? friendlyFirstSeed(seed) : seed;
       _puzzles.remove(level);
       unawaited(_save());
     }
     return previewPuzzle(level);
+  }
+
+  /// Grid size of [level]: the recorded size, the pre-6x6 size for a level the
+  /// player already holds (assigned, legacy or solved), else the current ramp.
+  int sizeOf(int level) {
+    final recorded = _data.puzzleSizes[level];
+    if (recorded != null) return recorded;
+    final held =
+        _data.puzzleSeeds.containsKey(level) ||
+        level <= _data.legacyThrough ||
+        (_data.records[level]?.stars ?? 0) > 0;
+    return held ? legacySizeForLevel(level) : sizeForLevel(level);
   }
 
   /// Returns an existing assignment or a legacy placeholder without saving
@@ -469,7 +508,7 @@ class GameStorage {
     if (seed == null &&
         level > _data.legacyThrough &&
         (_data.records[level]?.stars ?? 0) > 0) {
-      final size = sizeForLevel(level);
+      final size = sizeOf(level);
       return Puzzle(
         level: level,
         size: size,
@@ -477,8 +516,8 @@ class GameStorage {
       );
     }
     return seed == null
-        ? puzzleForLevel(level)
-        : generatePuzzle(level, seed: seed);
+        ? puzzleForLevel(level, sizeOverride: sizeOf(level))
+        : generatePuzzle(level, seed: seed, sizeOverride: sizeOf(level));
   });
 
   /// Resume any valid unfinished board before considering advancement.
@@ -558,7 +597,7 @@ class GameStorage {
     bool mistakes = false,
   }) async {
     puzzleFor(level);
-    final size = sizeForLevel(level);
+    final size = sizeOf(level);
     final stars = starsFor(size: size, seconds: seconds, mistakes: mistakes);
     final old = _data.records[level];
     final previousStars = old?.stars ?? 0;

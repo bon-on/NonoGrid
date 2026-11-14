@@ -152,4 +152,109 @@ void main() {
       expect(s.stars(1), 3);
     },
   );
+
+  group('6x6 step', () {
+    test('ramp is 5, 6, 7 ... and the old ramp is kept for old boards', () {
+      expect(
+        [for (var l = 1; l <= 9; l++) sizeForLevel(l)],
+        [
+          5, 5, 5, 5, 6, 6, 6, 6, 7, //
+        ],
+      );
+      expect(sizeForLevel(12), 7);
+      expect(sizeForLevel(13), 8);
+      expect(sizeForLevel(46), 15);
+      expect(
+        [for (var l = 5; l <= 8; l++) legacySizeForLevel(l)],
+        [
+          5, 5, 7, 7, //
+        ],
+      );
+      for (var l = 9; l <= 60; l++) {
+        expect(legacySizeForLevel(l), sizeForLevel(l), reason: 'level $l');
+      }
+    });
+
+    test(
+      'new levels 5-8 are 6x6, line solvable, and survive reopening',
+      () async {
+        final s = await fresh(4242);
+        for (var level = 1; level <= 8; level++) {
+          final p = s.puzzleFor(level);
+          expect(p.size, sizeForLevel(level), reason: 'level $level');
+          expect(isLineSolvable(p.solution, p.size), isTrue);
+        }
+        await s.setLevel(8);
+        final reopened = await GameStorage.open(seedSource: () => 1);
+        expect(reopened.puzzleFor(6).size, 6);
+        expect(reopened.puzzleFor(6).solution, s.puzzleFor(6).solution);
+      },
+    );
+
+    test('a player who already holds levels 5-8 keeps their sizes', () async {
+      SharedPreferences.setMockInitialValues({
+        GameStorage.progressKey: jsonEncode({
+          'version': 2,
+          'level': 7,
+          'maxCleared': 6,
+          'xp': 100,
+          'legacyThrough': 0,
+          'puzzleSeeds': {'5': 111, '6': 222, '7': 333},
+          'records': {
+            '5': {'best': 30, 'stars': 3},
+            '6': {'best': 40, 'stars': 2},
+          },
+        }),
+      });
+      final s = await GameStorage.open(seedSource: () => 999);
+      expect(s.puzzleFor(5).size, 5);
+      expect(s.puzzleFor(6).size, 5);
+      expect(s.puzzleFor(7).size, 7);
+      expect(
+        s.puzzleFor(5).solution,
+        generatePuzzle(5, seed: 111, sizeOverride: 5).solution,
+      );
+      // Level 8 was never assigned, so it follows the new ramp.
+      expect(s.puzzleFor(8).size, 6);
+      final clear = await s.recordClear(7, 90);
+      expect(clear.size, 7);
+    });
+
+    test('legacy players keep seed-by-level puzzles at the old size', () async {
+      SharedPreferences.setMockInitialValues({
+        GameStorage.progressKey: jsonEncode({
+          'version': 2,
+          'level': 7,
+          'maxCleared': 6,
+          'xp': 0,
+          'legacyThrough': 8,
+          'puzzleSeeds': <String, int>{},
+        }),
+      });
+      final s = await GameStorage.open(seedSource: () => 999);
+      expect(s.previewPuzzle(5).size, 5);
+      expect(s.previewPuzzle(7).size, 7);
+      expect(
+        s.previewPuzzle(7).solution,
+        puzzleForLevel(7, sizeOverride: 7).solution,
+      );
+      expect(s.previewPuzzle(9).size, 7);
+    });
+
+    test('damaged recorded sizes fall back to the old size', () async {
+      SharedPreferences.setMockInitialValues({
+        GameStorage.progressKey: jsonEncode({
+          'version': 2,
+          'level': 6,
+          'maxCleared': 5,
+          'xp': 0,
+          'legacyThrough': 0,
+          'puzzleSeeds': {'6': 222},
+          'puzzleSizes': {'6': 15, '7': 6},
+        }),
+      });
+      final s = await GameStorage.open(seedSource: () => 999);
+      expect(s.puzzleFor(6).size, 5);
+    });
+  });
 }

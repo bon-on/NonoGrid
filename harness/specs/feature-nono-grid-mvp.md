@@ -40,7 +40,8 @@ ambiguous (more than one picture fits the clues).
     already rewards clean play. Check is opt-in and has no penalty.
   - Levels: level N uses seed N. Levels 1-3 are hand-made pictures (Heart,
     Arrow, House); later levels are generated. Sizes ramp 5x5 (1-6), 7x7
-    (7-12), 8x8 (13-20), 10x10 (21-30), 12x12 (31-45), 15x15 (46+).
+    (7-12; levels assigned after the 6x6 step use 5x5 (1-4), 6x6 (5-8), 7x7 (9-12),
+    see `feature-size-ramp-6x6`), 8x8 (13-20), 10x10 (21-30), 12x12 (31-45), 15x15 (46+).
     Fill density target 50-60%, accepted range 45-68% after tweaks.
   - Every puzzle must be fully solvable by the line solver (see
     `adr-line-solvable-generator`), which implies a unique solution.

@@ -113,7 +113,7 @@ defaults. On CrazyGames this key syncs through the SDK Data module.
 - New levels use independently randomized, persisted seeds. Existing saves retain
   their previously exposed puzzles, including the original first three pictures.
 - Grid difficulty grows from 5x5 to
-  7x7, 8x8, 10x10, 12x12 and 15x15 (level 46+).
+  6x6 (levels 5-8), 7x7, 8x8, 10x10, 12x12 and 15x15 (level 46+).
 - See `harness/adrs/adr-line-solvable-generator.md` for how the generator
   and line solver guarantee a unique, guess-free solution.
 

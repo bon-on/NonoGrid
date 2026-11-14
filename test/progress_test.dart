@@ -90,6 +90,18 @@ void main() {
       expect(s.progress?.elapsedSeconds, 33);
     });
 
+    test(
+      'v1 migration pays XP at the sizes the levels had before 6x6',
+      () async {
+        final s = await _open({'level': 8, 'maxCleared': 7});
+        expect(
+          s.xp,
+          6 * clearXp(size: 5, stars: 1, previousStars: 0) +
+              clearXp(size: 7, stars: 1, previousStars: 0),
+        );
+      },
+    );
+
     test('a write stores v2 and keeps v1 keys', () async {
       final s = await _open({'level': 2, 'maxCleared': 1});
       await s.setLevel(2);

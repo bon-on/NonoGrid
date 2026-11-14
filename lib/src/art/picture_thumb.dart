@@ -7,6 +7,8 @@ import 'paper_palette.dart';
 /// recently used ones are cached.
 final Map<int, Puzzle> _puzzleCache = <int, Puzzle>{};
 
+/// Standalone previews only (new-ramp sizes); never for levels a player
+/// holds, which must come from `GameStorage.previewPuzzle`.
 Puzzle cachedPuzzle(int level) {
   final hit = _puzzleCache.remove(level);
   if (hit != null) return _puzzleCache[level] = hit;

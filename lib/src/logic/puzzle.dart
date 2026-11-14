@@ -52,14 +52,26 @@ const Map<int, (String, List<String>)> kPictures = {
   3: ('House', ['..#..', '.###.', '#####', '.#.##', '.#.##']),
 };
 
-/// Grid size for [level]: 5x5 ramping up to 15x15.
+/// Grid size for [level]: 5x5, a 6x6 step, then up to 15x15.
+///
+/// Players who already hold a puzzle for a level keep that puzzle's size
+/// (`GameStorage.sizeOf`); only levels assigned from now on use this ramp.
 int sizeForLevel(int level) {
-  if (level <= 6) return 5;
+  if (level <= 4) return 5;
+  if (level <= 8) return 6;
   if (level <= 12) return 7;
   if (level <= 20) return 8;
   if (level <= 30) return 10;
   if (level <= 45) return 12;
   return 15;
+}
+
+/// The ramp before the 6x6 step. Boards and records created under it keep
+/// these sizes, so saved puzzles, albums and stars do not change.
+int legacySizeForLevel(int level) {
+  if (level <= 6) return 5;
+  if (level <= 12) return 7;
+  return sizeForLevel(level);
 }
 
 /// True when [solution] can be fully solved by line logic alone.
@@ -79,12 +91,12 @@ class GeneratorStats {
 ///
 /// Levels with a hand-made picture use it; others are generated from seed
 /// `level`.
-Puzzle puzzleForLevel(int level, {GeneratorStats? stats}) {
+Puzzle puzzleForLevel(int level, {GeneratorStats? stats, int? sizeOverride}) {
   final picture = kPictures[level];
   if (picture != null) {
     return Puzzle.fromPicture(level, picture.$1, picture.$2);
   }
-  return generatePuzzle(level, stats: stats);
+  return generatePuzzle(level, stats: stats, sizeOverride: sizeOverride);
 }
 
 /// True when [clue] alone settles every cell of a line of [size] cells:
