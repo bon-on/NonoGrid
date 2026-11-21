@@ -12,6 +12,8 @@ related_specs:
   - feature-sound-effects
   - feature-retention-polish
   - feature-random-practice
+  - feature-line-assist
+  - feature-size-ramp-6x6
 evidence_files:
   - reports/nono-grid-mvp-verification.md
 ---

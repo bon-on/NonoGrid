@@ -11,6 +11,8 @@ related_specs:
   - feature-retention-polish
   - feature-random-practice
   - feature-portal-quality-pass
+  - feature-line-assist
+  - feature-size-ramp-6x6
 ---
 
 # ADR: Generate levels from seeded random grids accepted only when line logic solves them

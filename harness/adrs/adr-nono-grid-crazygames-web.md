@@ -10,6 +10,7 @@ related_specs:
   - feature-crazygames-cloud-save
   - feature-portal-quality-pass
   - feature-short-viewport-layout
+  - feature-large-screen-scale
 ---
 
 # ADR: Use a build flag and a platform adapter for the CrazyGames build

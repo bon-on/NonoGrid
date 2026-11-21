@@ -10,6 +10,7 @@ related_specs:
   - feature-crazygames-cloud-save
   - feature-portal-quality-pass
   - feature-short-viewport-layout
+  - feature-large-screen-scale
 evidence_files:
   - docs/crazygames.md
   - reports/nono-grid-crazygames-verification.md

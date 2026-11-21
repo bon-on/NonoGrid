@@ -49,3 +49,7 @@ text looks tiny and most of the desk is empty. CrazyGames reviewers and players 
 | Requirement | Files | Verification |
 |---|---|---|
 | Scale rule and scaled wide layout | `lib/src/ui/game_screen.dart` | `test/large_screen_scale_test.dart` |
+
+## Evidence
+- `flutter analyze`, `flutter test` (295 passed), `flutter test --platform chrome test/web` (23 passed), `tool/build_crazygames.sh`
+- Chrome check 2026-11-21: CrazyGames bundle in a 1920x1080 iframe shows the 1.5x layout; a drag across a row fills it.

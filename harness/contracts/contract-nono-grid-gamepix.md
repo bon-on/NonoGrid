@@ -7,6 +7,7 @@ related_specs:
   - feature-nono-grid-gamepix
   - feature-portal-quality-pass
   - feature-short-viewport-layout
+  - feature-large-screen-scale
 evidence_files:
   - docs/gamepix.md
   - reports/nono-grid-gamepix-verification.md
