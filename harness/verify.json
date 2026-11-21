@@ -1,0 +1,5 @@
+{
+  "command": ["flutter", "test", "--reporter", "expanded"],
+  "inputs": ["lib", "test", "web", "assets", "tool", "harness", "pubspec.yaml", "pubspec.lock", "AGENTS.md", "CLAUDE.md", ".claude/agents"],
+  "timeoutMs": 180000
+}

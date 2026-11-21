@@ -46,3 +46,5 @@ app.*.map.json
 
 # harness-lab local transaction backups
 .harness-lab/backups/
+.harness-lab/lock
+out/
