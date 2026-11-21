@@ -70,6 +70,22 @@ const double kCompactIconToolsMaxWidth = 600;
 /// into a single row so the board keeps its height.
 const double kFoldedMetaMaxHeight = 700;
 
+/// Wide windows bigger than this lay the wide layout out at this size and
+/// scale it up (feature-large-screen-scale).
+const Size kWideDesignSize = Size(1280, 720);
+
+/// Largest scale of the wide layout.
+const double kMaxWideScale = 1.6;
+
+/// Uniform scale of the wide layout in a window of [size]: 1 up to
+/// [kWideDesignSize], then growing with the smaller ratio, capped.
+double wideScaleFor(Size size) => math
+    .min(
+      size.width / kWideDesignSize.width,
+      size.height / kWideDesignSize.height,
+    )
+    .clamp(1.0, kMaxWideScale);
+
 ScreenLayout screenLayoutFor(Size size) {
   if (size.width >= 700 && size.width > size.height * 1.3) {
     return ScreenLayout.wide;
@@ -1165,7 +1181,7 @@ class _GameScreenState extends State<GameScreen>
                 ),
                 SafeArea(
                   child: switch (layout) {
-                    ScreenLayout.wide => _wideLayout(p, size),
+                    ScreenLayout.wide => _scaledWideLayout(p),
                     ScreenLayout.compact => _compactLayout(p, size),
                     ScreenLayout.stacked => _narrowLayout(p, size),
                   },
@@ -1355,6 +1371,34 @@ class _GameScreenState extends State<GameScreen>
   bool get _showWinBar => _game.isWon && _panel != _Panel.summary;
 
   // Wide: left info panel, board, right tool panel.
+  /// The wide layout, laid out at the design size and scaled up on large
+  /// windows (feature-large-screen-scale). The same structure is used at
+  /// scale 1 so going fullscreen does not remount it.
+  Widget _scaledWideLayout(PaperPalette p) {
+    return LayoutBuilder(
+      builder: (context, box) {
+        final scale = wideScaleFor(box.biggest);
+        final inner = Size(box.maxWidth / scale, box.maxHeight / scale);
+        final media = MediaQuery.of(context);
+        return SizedBox(
+          key: const ValueKey('wide-scaled'),
+          width: box.maxWidth,
+          height: box.maxHeight,
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: SizedBox.fromSize(
+              size: inner,
+              child: MediaQuery(
+                data: media.copyWith(size: inner),
+                child: _wideLayout(p, inner),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _wideLayout(PaperPalette p, Size size) {
     final leftW = (size.width * 0.21).clamp(200.0, 270.0);
     final rightW = (size.width * 0.18).clamp(180.0, 236.0);

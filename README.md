@@ -19,6 +19,10 @@ no accounts; progress is stored locally on the device.
 - Solving the puzzle blooms the picture into colour and unlocks the next
   level.
 
+- Fullscreen and big windows: wide windows larger than 1280x720 show the
+  1280x720 layout scaled up uniformly (up to 1.6x), so the board and panels
+  fill the screen (`feature-large-screen-scale`).
+
 ### Stars, XP, album and themes
 
 - Each level awards up to 3 stars: solve it, never let **Check** find a

@@ -71,6 +71,8 @@ Out of scope: game rules, saves, generators, dailies, portal submission,
 portal websites, new dependencies.
 
 ## Acceptance Criteria
+> 2026-11-21: wide windows larger than 1280x720 now scale up (`feature-large-screen-scale`); "unscaled" below means "never scaled down".
+
 - `screenLayoutFor` returns `compact` for 620x349, 640x480, 600x338,
   560x315, 667x375; `wide` for 844x390, 932x430, 870x480, 1280x720,
   1366x768; `stacked` for 800x700, 360x640, 390x844, 320x568.

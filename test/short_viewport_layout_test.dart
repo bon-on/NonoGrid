@@ -145,10 +145,16 @@ void main() {
       await _launch(t, size);
       final board = _checkScreen(t, size);
       expect(board.height, greaterThanOrEqualTo(minBoard));
-      // Unscaled: the clue font keeps its 11 px minimum.
+      // Unscaled: the clue font keeps its 11 px minimum. Only wide windows
+      // larger than 1280x720 scale up (feature-large-screen-scale).
       final raw = t.getSize(_canvas);
-      expect(board.width, closeTo(raw.width, 0.5));
-      expect(board.height, closeTo(raw.height, 0.5));
+      // These tests set no insets, so the window equals the SafeArea box the
+      // app scales by.
+      final up = screenLayoutFor(size) == ScreenLayout.wide
+          ? wideScaleFor(size)
+          : 1.0;
+      expect(board.width, closeTo(raw.width * up, 0.5));
+      expect(board.height, closeTo(raw.height * up, 0.5));
     });
 
     testWidgets('first-run tips leave the board playable at $size', (t) async {
