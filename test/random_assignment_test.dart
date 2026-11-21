@@ -47,7 +47,7 @@ void main() {
   });
 
   test(
-    'clear without Next resumes next level; unfinished replay wins',
+    'clear without Next resumes next level; an unfinished replay is kept',
     () async {
       final s = await fresh(12345);
       await s.setLevel(1);
@@ -57,7 +57,8 @@ void main() {
       await reopened.saveProgress(SavedProgress(1, '#${'.' * 24}', 19));
       await reopened.setLevel(2);
       reopened = await GameStorage.open();
-      expect(reopened.startupLevel, 1);
+      expect(reopened.startupLevel, 2, reason: 'the frontier wins');
+      expect(reopened.progressFor(1)?.elapsedSeconds, 19);
       expect(reopened.xp, s.xp);
     },
   );
@@ -256,5 +257,51 @@ void main() {
       final s = await GameStorage.open(seedSource: () => 999);
       expect(s.puzzleFor(6).size, 5);
     });
+
+    test('recovers a 6x6 board when older storage drops its size', () async {
+      final marks = '#${List.filled(35, '.').join()}';
+      SharedPreferences.setMockInitialValues({
+        GameStorage.progressKey: jsonEncode({
+          'version': 2,
+          'level': 6,
+          'maxCleared': 5,
+          'legacyThrough': 0,
+          'puzzleSeeds': {'5': 111, '6': 222},
+          'progress': SavedProgress(6, marks, 29, mistakes: true).toJson(),
+        }),
+      });
+      final s = await GameStorage.open();
+      expect(s.startupLevel, 6);
+      expect(s.puzzleFor(5).size, 5);
+      expect(s.puzzleFor(6).solution, generatePuzzle(6, seed: 222).solution);
+      expect(s.progress?.cells, marks);
+      expect(s.progress?.elapsedSeconds, 29);
+      expect(s.progress?.mistakes, isTrue);
+      await s.setLevel(6);
+      final reopened = await GameStorage.open();
+      expect(reopened.puzzleFor(6).size, 6);
+    });
+
+    test(
+      'an old-client rewrite cannot strip backed-up assignment sizes',
+      () async {
+        final s = await fresh(4242);
+        final level5 = s.puzzleFor(5);
+        s.puzzleFor(7);
+        await s.setLevel(5);
+        final prefs = await SharedPreferences.getInstance();
+        final oldClient =
+            jsonDecode(prefs.getString(GameStorage.progressKey)!)
+                as Map<String, dynamic>;
+        oldClient.remove('puzzleSizes');
+        final seeds = oldClient['puzzleSeeds'] as Map<String, dynamic>;
+        seeds['7'] = 4243;
+        await prefs.setString(GameStorage.progressKey, jsonEncode(oldClient));
+
+        final reopened = await GameStorage.open();
+        expect(reopened.puzzleFor(5).solution, level5.solution);
+        expect(reopened.puzzleFor(7).size, 7, reason: 'the seed has changed');
+      },
+    );
   });
 }

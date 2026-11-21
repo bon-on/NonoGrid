@@ -47,6 +47,24 @@ Puzzle dailyPuzzle(int day, {GeneratorStats? stats}) => generatePuzzle(
   stats: stats,
 );
 
+/// Time from [local] until the next local calendar date (the next daily).
+Duration untilNextDaily(DateTime local) {
+  final next = local.isUtc
+      ? DateTime.utc(local.year, local.month, local.day + 1)
+      : DateTime(local.year, local.month, local.day + 1);
+  final left = next.difference(local);
+  return left.isNegative ? Duration.zero : left;
+}
+
+/// Short countdown such as `5h 12m` or `7m`, rounded up to whole minutes.
+String formatCountdown(Duration left) {
+  final minutes = math.max(1, (left.inSeconds + 59) ~/ 60);
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '${m}m';
+  return m == 0 ? '${h}h' : '${h}h ${m}m';
+}
+
 /// Bonus XP for a rewarded daily solve that brought the streak to [streak].
 int dailyBonusXp(int streak) => 10 + 5 * math.min(math.max(streak, 1) - 1, 4);
 

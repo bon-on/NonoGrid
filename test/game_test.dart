@@ -178,6 +178,20 @@ void main() {
       expect(g.at(2, 0), Mark.filled);
     });
 
+    test('undo restores ink erased and auto-crossed in the same action', () {
+      final g = _game();
+      g.tap(1, 0, Tool.fill);
+      g.tap(2, 0, Tool.fill);
+      g.tap(3, 0, Tool.fill);
+      final before = g.encode();
+
+      g.tap(3, 0, Tool.fill);
+      expect(g.colSatisfied(0), isTrue);
+      expect(g.at(3, 0), Mark.crossed);
+      expect(g.undo(), isTrue);
+      expect(g.encode(), before);
+    });
+
     test('a line that already matched is not crossed again', () {
       final g = _game();
       g.tap(1, 0, Tool.fill);

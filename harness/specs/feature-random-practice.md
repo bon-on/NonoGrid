@@ -29,6 +29,8 @@ Fresh installs always start with the same curated level 1 puzzle. The user expli
 - Two fresh sessions with injected different seed sources get different level 1 solutions; fixed seed source is reproducible on VM/web.
 - Randomized puzzles at all existing sizes are line-solvable. Default puzzleForLevel/generatePuzzle calls keep historical deterministic solutions for migration.
 - Save marks/time/mistakes, reopen storage and app: identical puzzle and board resume. Restart and replay preserve seed; next new level gets a new assignment.
+- Time spent thinking since the last move is saved when the player leaves a
+  running board with the previous or next level arrow.
 - Clear a level, close before Next, reopen: next unfinished level starts. An unfinished replay of a cleared level resumes rather than skips.
 - Legacy v1 and v2 saves retain exposed levels, solved records, saved boards and album pictures; invalid optional seed data does not crash or silently attach marks to a different puzzle.
 - Thumbnail caching distinguishes assigned solutions and does not allocate assignments for unopened locked levels.

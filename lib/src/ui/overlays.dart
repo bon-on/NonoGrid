@@ -111,10 +111,15 @@ class SummaryOverlay extends StatefulWidget {
     this.onFinished,
     this.onCopy,
     this.today,
+    this.dailyHook,
   });
 
   final PaperPalette palette;
   final ClearResult result;
+
+  /// Countdown to the next daily with the streak/grace state, shown after
+  /// level and daily clears alike.
+  final String? dailyHook;
 
   /// Today's day number, so a daily finished after midnight points to
   /// today's daily instead of tomorrow's.
@@ -229,18 +234,31 @@ class _SummaryOverlayState extends State<SummaryOverlay>
           compact: true,
           onPressed: widget.onAlbum,
         ),
-        PaperButton(
-          key: const Key('summary-next'),
-          palette: p,
-          label: daily == null ? 'Next' : 'Levels',
-          icon: daily == null
-              ? Icons.arrow_forward_rounded
-              : Icons.map_outlined,
-          primary: true,
-          onPressed: widget.onNext,
+        // Enter/Space press this button, so it wears a focus ring and the
+        // full-size style while the others stay compact.
+        DecoratedBox(
+          key: const Key('summary-next-focus'),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: p.accent, width: 2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: PaperButton(
+              key: const Key('summary-next'),
+              palette: p,
+              label: daily == null ? 'Next' : 'Levels',
+              icon: daily == null
+                  ? Icons.arrow_forward_rounded
+                  : Icons.map_outlined,
+              primary: true,
+              onPressed: widget.onNext,
+            ),
+          ),
         ),
       ],
     );
+    final hook = widget.dailyHook;
     return OverlayFrame(
       palette: p,
       maxWidth: 420,
@@ -271,6 +289,34 @@ class _SummaryOverlayState extends State<SummaryOverlay>
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
                 ),
+              ),
+            ],
+            if (hook != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.local_fire_department_rounded,
+                    size: 16,
+                    color: Color(0xFFF07A2B),
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      hook,
+                      key: const Key('summary-daily-hook'),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.panelText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 10),

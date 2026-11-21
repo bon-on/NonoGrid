@@ -14,13 +14,6 @@ extension on Tool {
 /// Axis a stroke is locked to after the pointer leaves the start cell.
 enum StrokeAxis { none, row, col }
 
-class _Change {
-  const _Change(this.index, this.before, this.after);
-  final int index;
-  final Mark before;
-  final Mark after;
-}
-
 /// An in-progress drag stroke.
 ///
 /// The start cell decides the action: if it already holds the tool's mark the
@@ -49,7 +42,7 @@ class NonoGame {
 
   final Puzzle puzzle;
   final List<Mark> cells;
-  final List<List<_Change>> _undo = [];
+  final List<Map<int, Mark>> _undo = [];
   _Stroke? _stroke;
   bool _won = false;
 
@@ -123,21 +116,17 @@ class NonoGame {
     final s = _stroke;
     if (s == null) return;
     _stroke = null;
-    final changes = [
-      for (final e in s.original.entries)
-        if (cells[e.key] != e.value) _Change(e.key, e.value, cells[e.key]),
-    ];
     _checkWin();
-    if (changes.isNotEmpty) {
-      if (!_won) _autoCross(changes, s.original);
-      _undo.add(changes);
-    }
+    s.original.removeWhere((index, mark) => cells[index] == mark);
+    if (s.original.isEmpty) return;
+    if (!_won) _autoCross(s.original);
+    _undo.add(s.original);
   }
 
   /// Crosses the empty cells of every row and column that this action made
-  /// newly match its clue, adding the crosses to [changes] (one undo step).
-  /// Uses clues only; [original] holds the pre-action state of touched cells.
-  void _autoCross(List<_Change> changes, Map<int, Mark> original) {
+  /// newly match its clue. [original] records each cell's pre-action mark
+  /// once so the stroke and all automatic crosses undo together.
+  void _autoCross(Map<int, Mark> original) {
     bool wasFilled(int r, int c) {
       final i = r * size + c;
       return (original[i] ?? cells[i]) == Mark.filled;
@@ -167,8 +156,8 @@ class NonoGame {
     for (final line in lines) {
       for (final i in line) {
         if (cells[i] != Mark.empty) continue;
+        original.putIfAbsent(i, () => Mark.empty);
         cells[i] = Mark.crossed;
-        changes.add(_Change(i, Mark.empty, Mark.crossed));
       }
     }
   }
@@ -187,8 +176,8 @@ class NonoGame {
     if (_stroke != null) endStroke();
     if (_won || _undo.isEmpty) return false;
     final changes = _undo.removeLast();
-    for (final ch in changes) {
-      cells[ch.index] = ch.before;
+    for (final entry in changes.entries) {
+      cells[entry.key] = entry.value;
     }
     return true;
   }

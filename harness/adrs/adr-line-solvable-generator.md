@@ -83,3 +83,19 @@ Old clients that read a newer save ignore `puzzleSizes` and would show levels 5-
 A cached older client that re-saves a newer save drops `puzzleSizes`; levels assigned in between
 then return to the old size when a newer client reopens it (a different puzzle, albums and boards
 for those levels change). Accepted: the 6x6 levels are only 5-8 and the game was just launched.
+
+### Rewrite recovery
+
+The current client stores 6x6 assignments for levels 5-8 in a companion
+preference as level-to-seed pairs. Old local clients leave this preference
+alone when they rewrite the main progress value. On load a missing size is
+recovered only when the current assignment's seed matches the backup. A valid
+36-cell unfinished board with a known seed also restores a missing size.
+Explicit valid sizes in the main value take precedence. The main value still
+stores each size with its seed.
+
+The CrazyGames adapter writes all preferences as one cloud snapshot. A client
+already open before the backup existed can still upload a snapshot that lacks
+it, and an old client can play the old size while it is running. A rewritten
+board or size-less record without either recovery signal cannot be attributed
+to a 6x6 assignment after the fact.

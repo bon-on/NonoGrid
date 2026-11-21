@@ -85,6 +85,25 @@ class DailyInfo {
       ? 'Grace ready: one missed day is forgiven'
       : 'Grace refills in $refillLeft daily '
             '${refillLeft == 1 ? 'solve' : 'solves'}';
+
+  /// One line for the clear summary that points at the next daily, with the
+  /// streak and grace state. [now] is the local time used for the countdown.
+  String summaryHook(DateTime now) {
+    final left = formatCountdown(untilNextDaily(now));
+    final n = streak.current;
+    if (state == DailyState.done) {
+      final grace = graceReady ? 'grace ready' : 'grace refills in $refillLeft';
+      return 'New daily in $left  -  Streak $n, $grace';
+    }
+    return switch (streak.status) {
+      StreakStatus.pending =>
+        "Solve today's daily to keep streak $n ($left left)",
+      StreakStatus.graceCovers =>
+        "Your grace saves streak $n: solve today's daily ($left left)",
+      StreakStatus.none ||
+      StreakStatus.safe => "Today's daily is waiting ($left left)",
+    };
+  }
 }
 
 class _Flame extends StatelessWidget {

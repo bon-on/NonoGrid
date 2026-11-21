@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'logic/game.dart';
 import 'logic/puzzle.dart';
 import 'logic/rng.dart';
 import 'meta/collection.dart';
@@ -201,13 +200,14 @@ class NonoProgressData {
     Map<int, LevelRecord>? records,
     this.xp = 0,
     this.theme = NonoTheme.notebook,
-    this.progress,
+    Map<int, SavedProgress>? boards,
     Map<int, int>? puzzleSeeds,
     Map<int, int>? puzzleSizes,
     this.legacyThrough = 0,
     DailyData? daily,
     Set<int>? setsAwarded,
   }) : records = records ?? <int, LevelRecord>{},
+       boards = boards ?? <int, SavedProgress>{},
        puzzleSeeds = puzzleSeeds ?? <int, int>{},
        puzzleSizes = puzzleSizes ?? <int, int>{},
        daily = daily ?? DailyData(),
@@ -218,7 +218,17 @@ class NonoProgressData {
   final Map<int, LevelRecord> records;
   int xp;
   NonoTheme theme;
-  SavedProgress? progress;
+
+  /// Unfinished boards by level in save order (oldest first), at most
+  /// [maxBoards]. Dart map literals keep insertion order.
+  final Map<int, SavedProgress> boards;
+
+  /// Unfinished boards kept at once; the oldest is dropped beyond this.
+  static const int maxBoards = 5;
+
+  /// Most recently saved unfinished board.
+  SavedProgress? get progress => boards.isEmpty ? null : boards.values.last;
+
   final Map<int, int> puzzleSeeds;
 
   /// Grid size of each assigned level, recorded when it is assigned. A level
@@ -246,14 +256,26 @@ class NonoProgressData {
           'stars': e.value.stars,
         },
     },
+    // Clients from before `boards` read only this single slot; mirroring the
+    // most recent board there lets them resume it as they always did.
     if (progress != null) 'progress': progress!.toJson(),
+    // Each board carries the seed it was played on, so it is never applied
+    // to a different puzzle (an older client may reassign a seed).
+    if (boards.isNotEmpty)
+      'boards': [
+        for (final b in boards.values)
+          {...b.toJson(), 'seed': ?puzzleSeeds[b.level]},
+      ],
     'daily': daily.toJson(),
     'setsAwarded': setsAwarded.toList()..sort(),
   };
 
   /// Parses [raw]; returns null when it is missing or malformed so the
   /// caller can fall back.
-  static NonoProgressData? tryParse(String? raw) {
+  static NonoProgressData? tryParse(
+    String? raw, {
+    Map<String, Object?> sizeBackup = const {},
+  }) {
     if (raw == null) return null;
     try {
       final json = jsonDecode(raw);
@@ -314,6 +336,16 @@ class NonoProgressData {
           }
         }
       }
+      for (var level = 5; level <= 8; level++) {
+        final seed = seeds[level];
+        final backupSeed = sizeBackup['$level'];
+        if (!sizes.containsKey(level) &&
+            seed != null &&
+            backupSeed is int &&
+            backupSeed == seed) {
+          sizes[level] = 6;
+        }
+      }
       // A missing/corrupt seed cannot safely identify the board these marks
       // belong to. Keep earned meta progress, but never apply those marks to
       // a newly generated puzzle.
@@ -321,6 +353,49 @@ class NonoProgressData {
           progress.level > legacyThrough &&
           !seeds.containsKey(progress.level)) {
         progress = null;
+      }
+      // Per-level boards must also match the seed stamped on them: a level
+      // whose seed changed since (older-client rewrite) drops its board.
+      final boards = <int, SavedProgress>{};
+      final listed = <int>{};
+      final rawBoards = json['boards'];
+      if (rawBoards is List) {
+        for (final raw in rawBoards) {
+          final board = SavedProgress.fromJson(raw);
+          if (board == null) continue;
+          listed.add(board.level);
+          final stamped = (raw as Map)['seed'];
+          final matches = board.level <= legacyThrough
+              ? stamped == null
+              : stamped is int && stamped == seeds[board.level];
+          if (!matches) continue;
+          boards
+            ..remove(board.level)
+            ..[board.level] = board;
+        }
+      }
+      // `progress` is the only board an older client writes (it drops
+      // `boards`), so a board missing from `boards` came from one and is
+      // the most recent. A level listed in `boards` but rejected for its
+      // seed must not come back through this unstamped mirror.
+      if (progress != null && !listed.contains(progress.level)) {
+        boards[progress.level] = progress;
+      }
+      while (boards.length > maxBoards) {
+        boards.remove(boards.keys.first);
+      }
+      for (final board in boards.values) {
+        final level = board.level;
+        if (!seeds.containsKey(level)) continue;
+        final currentSize = sizeForLevel(level);
+        // An older client may have stripped puzzleSizes while keeping the
+        // unfinished board. Its marks still identify the size of that seed.
+        if (!sizes.containsKey(level) &&
+            currentSize != legacySizeForLevel(level) &&
+            board.cells.length == currentSize * currentSize &&
+            !RegExp(r'[^.#x]').hasMatch(board.cells)) {
+          sizes[level] = currentSize;
+        }
       }
       return NonoProgressData(
         level: level,
@@ -330,7 +405,7 @@ class NonoProgressData {
         theme: NonoTheme.fromId(
           json['theme'] is String ? json['theme'] as String : null,
         ),
-        progress: progress,
+        boards: boards,
         puzzleSeeds: seeds,
         puzzleSizes: sizes,
         legacyThrough: legacyThrough,
@@ -418,7 +493,7 @@ class NonoProgressData {
       maxCleared: maxCleared,
       records: records,
       xp: xp,
-      progress: progress,
+      boards: progress == null ? null : {progress.level: progress},
       legacyThrough: legacyKeys
           ? _exposedThrough(level, maxCleared, progress, records)
           : 0,
@@ -427,14 +502,23 @@ class NonoProgressData {
 }
 
 /// Local persistence: current level, cleared levels, best times, stars, XP,
-/// theme and the in-progress board.
+/// theme and the unfinished boards.
 ///
 /// Everything is read once in [open] (before the app starts), so nothing is
 /// ever saved before the stored value has loaded. Write failures are ignored.
 class GameStorage {
-  GameStorage._(this._prefs, this._data, this._seedSource);
+  GameStorage._(
+    this._prefs,
+    this._data,
+    this._seedSource,
+    this._savedSizeBackup,
+  );
 
   static const progressKey = 'nonogrid_progress_v2';
+
+  /// Older clients rewrite [progressKey] without preserving puzzleSizes.
+  /// Keep a copy of the 6x6 assignments as level-to-seed pairs.
+  static const sizeBackupKey = 'nonogrid_6x6_seeds_v1';
 
   static Future<GameStorage> open({int Function()? seedSource}) async {
     final prefs = await SharedPreferences.getInstance();
@@ -446,13 +530,28 @@ class GameStorage {
     int Function()? seedSource,
   }) {
     String? raw;
+    String? rawSizeBackup;
+    Map<String, Object?> sizeBackup = const {};
     try {
       raw = prefs.getString(progressKey);
     } catch (_) {}
+    try {
+      rawSizeBackup = prefs.getString(sizeBackupKey);
+      if (rawSizeBackup != null) {
+        final decoded = jsonDecode(rawSizeBackup);
+        if (decoded is Map<String, Object?>) sizeBackup = decoded;
+      }
+    } catch (_) {}
     final data =
-        NonoProgressData.tryParse(raw) ?? NonoProgressData.fromLegacy(prefs);
+        NonoProgressData.tryParse(raw, sizeBackup: sizeBackup) ??
+        NonoProgressData.fromLegacy(prefs);
     final rng = SeededRng(DateTime.now().microsecondsSinceEpoch);
-    return GameStorage._(prefs, data, seedSource ?? rng.nextUint32);
+    return GameStorage._(
+      prefs,
+      data,
+      seedSource ?? rng.nextUint32,
+      rawSizeBackup,
+    );
   }
 
   final SharedPreferences _prefs;
@@ -460,10 +559,23 @@ class GameStorage {
   final int Function() _seedSource;
   final Map<int, Puzzle> _puzzles = {};
   Future<void> _pendingWrite = Future.value();
+  String? _savedSizeBackup;
 
   Future<void> _save() {
     final snapshot = jsonEncode(_data.toJson());
+    final sixBySixSeeds = {
+      for (var level = 5; level <= 8; level++)
+        if (_data.puzzleSizes[level] == 6) '$level': _data.puzzleSeeds[level]!,
+    };
+    final backup = sixBySixSeeds.isEmpty ? null : jsonEncode(sixBySixSeeds);
     _pendingWrite = _pendingWrite.then((_) async {
+      if (backup != null && backup != _savedSizeBackup) {
+        try {
+          if (await _prefs.setString(sizeBackupKey, backup)) {
+            _savedSizeBackup = backup;
+          }
+        } catch (_) {}
+      }
       try {
         await _prefs.setString(progressKey, snapshot);
       } catch (_) {}
@@ -520,20 +632,9 @@ class GameStorage {
         : generatePuzzle(level, seed: seed, sizeOverride: sizeOf(level));
   });
 
-  /// Resume any valid unfinished board before considering advancement.
-  int get startupLevel {
-    final selected = level.clamp(1, unlocked);
-    final saved = progress;
-    if (saved != null &&
-        saved.level >= 1 &&
-        saved.level <= unlocked &&
-        (saved.level <= _data.legacyThrough ||
-            _data.puzzleSeeds.containsKey(saved.level))) {
-      final game = NonoGame(previewPuzzle(saved.level));
-      if (game.restore(saved.cells) && !game.isWon) return saved.level;
-    }
-    return selected <= maxCleared ? unlocked : selected;
-  }
+  /// Opens on the frontier (highest unlocked) level; its own saved board is
+  /// resumed when it loads. Boards of other levels stay saved for later.
+  int get startupLevel => unlocked;
 
   int get level => _data.level;
   Future<void> setLevel(int level) {
@@ -631,7 +732,7 @@ class GameStorage {
     }
     _data.xp += xpGained;
     final after = painterLevel;
-    if (_data.progress?.level == level) _data.progress = null;
+    _data.boards.remove(level);
     await _save();
     return ClearResult(
       level: level,
@@ -758,16 +859,36 @@ class GameStorage {
     );
   }
 
+  /// Most recently saved unfinished level board.
   SavedProgress? get progress => _data.progress;
 
+  /// Saved unfinished board of [level], only while [level] still has the
+  /// puzzle assignment the board was played on.
+  SavedProgress? progressFor(int level) {
+    final saved = _data.boards[level];
+    if (saved == null) return null;
+    if (level > _data.legacyThrough && !_data.puzzleSeeds.containsKey(level)) {
+      return null;
+    }
+    return saved;
+  }
+
+  /// Saves [p] as its level's board and makes it the most recent one; the
+  /// oldest board beyond [NonoProgressData.maxBoards] is dropped.
   Future<void> saveProgress(SavedProgress p) {
     puzzleFor(p.level);
-    _data.progress = p;
+    final boards = _data.boards
+      ..remove(p.level)
+      ..[p.level] = p;
+    while (boards.length > NonoProgressData.maxBoards) {
+      boards.remove(boards.keys.first);
+    }
     return _save();
   }
 
-  Future<void> clearProgress() {
-    _data.progress = null;
+  /// Drops the saved board of [level].
+  Future<void> clearProgress(int level) {
+    if (_data.boards.remove(level) == null) return _pendingWrite;
     return _save();
   }
 }

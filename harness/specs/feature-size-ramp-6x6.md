@@ -33,7 +33,8 @@ and random practice sizes are unchanged.
 - A saved game with seeds for levels 5-7 and no `puzzleSizes` loads the same 5x5/5x5/7x7 puzzles,
   stars, XP and clear size as before.
 - New assignments store their size; reopening gives the same puzzle. A damaged size entry is
-  ignored (old size).
+  ignored. When size metadata is missing, a matching seed backup or valid
+  unfinished 6x6 marks recover that size. Otherwise the old size is used.
 - Levels 1-60 are line-solvable at their size; VM, dart2js and dart2wasm produce identical puzzles
   (`tool/check_runtime_parity.sh`), and the pinned parity hash is updated.
 - Layouts at 390x844, 1280x720 and short viewports are unchanged (6x6 is smaller than 7x7).

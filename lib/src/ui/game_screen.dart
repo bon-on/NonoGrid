@@ -138,6 +138,7 @@ class GameScreen extends StatefulWidget {
     this.onSfxPlayed,
     this.onHaptic,
     this.clock = DateTime.now,
+    this.stopwatch,
     this.copier = const ResultCopier(),
   });
 
@@ -145,6 +146,9 @@ class GameScreen extends StatefulWidget {
 
   /// Local time source for the daily puzzle; tests inject a fixed clock.
   final DateTime Function() clock;
+
+  /// Optional stopwatch for deterministic elapsed-time tests.
+  final Stopwatch? stopwatch;
 
   /// Clipboard access for the daily copy-result text; tests inject a fake.
   final ResultCopier copier;
@@ -191,7 +195,7 @@ class _GameScreenState extends State<GameScreen>
 
   // Timer: seconds carried over from a saved session plus the running clock.
   int _baseSeconds = 0;
-  final Stopwatch _clock = Stopwatch();
+  late final Stopwatch _clock = widget.stopwatch ?? Stopwatch();
   Timer? _ticker;
 
   late final AnimationController _reveal = AnimationController(
@@ -611,6 +615,18 @@ class _GameScreenState extends State<GameScreen>
       _summaryShown = true;
     });
     _syncGameplay();
+    // Enter/Space on the summary mean Next; keep the keys routed here even
+    // when the winning move came from a panel button.
+    _focus.requestFocus();
+  }
+
+  /// Builds the next level's puzzle while the summary sits idle, so Next
+  /// opens it at once. Generation takes well under a frame (see
+  /// feature-next-session-hooks) and runs only after the summary animation.
+  void _warmNextLevel() {
+    final next = _level + 1;
+    if (!mounted || _dailyDay != null || next > _storage.unlocked) return;
+    _storage.puzzleFor(next);
   }
 
   @override
@@ -666,7 +682,7 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Keeps the elapsed time of a running daily board before it is left.
+  /// Keeps the elapsed time of a running board before it is left.
   void _leaveBoard() {
     if (_clock.isRunning && !_game.isWon) {
       _clock.stop();
@@ -693,12 +709,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _load(int level) {
-    if (_dailyDay != null) _leaveBoard();
+    _leaveBoard();
     _dailyDay = null;
     _level = level;
     _resetBoard(_storage.puzzleFor(level));
-    final saved = _storage.progress;
-    if (saved != null && saved.level == level) {
+    final saved = _storage.progressFor(level);
+    if (saved != null) {
       if (_game.restore(saved.cells) && !_game.isWon) {
         _baseSeconds = saved.elapsedSeconds;
         _mistakeMade = saved.mistakes;
@@ -711,6 +727,7 @@ class _GameScreenState extends State<GameScreen>
 
   /// Opens [day]'s daily puzzle, resuming its saved board of that day.
   void _loadDaily(int day) {
+    _leaveBoard();
     _dailyDay = day;
     _resetBoard(_storage.dailyPuzzleFor(day));
     final saved = _storage.dailyProgressFor(day);
@@ -810,8 +827,8 @@ class _GameScreenState extends State<GameScreen>
 
   void _goTo(int level) {
     if (level < 1 || level > _storage.unlocked) return;
-    // Saved progress is kept: it belongs to one level and is restored when
-    // that level is opened again, until a move on another level replaces it.
+    // Each level keeps its own unfinished board (the most recent few) and
+    // gets it back when it is opened again.
     setState(() {
       if (_panel == _Panel.summary) _panel = _Panel.none;
       _load(level);
@@ -901,8 +918,8 @@ class _GameScreenState extends State<GameScreen>
     });
     if (_dailyDay != null) {
       unawaited(_storage.clearDailyProgress());
-    } else if (_storage.progress?.level == _level) {
-      unawaited(_storage.clearProgress());
+    } else {
+      unawaited(_storage.clearProgress(_level));
     }
     _syncGameplay();
   }
@@ -992,7 +1009,7 @@ class _GameScreenState extends State<GameScreen>
           mistakes: _mistakeMade,
         );
       } else {
-        unawaited(_storage.clearProgress());
+        unawaited(_storage.clearProgress(_level));
         record = _storage.recordClear(_level, seconds, mistakes: _mistakeMade);
       }
       record.then((r) {
@@ -1236,6 +1253,10 @@ class _GameScreenState extends State<GameScreen>
             onNext: _advance,
             onCopy: result.daily != null ? _copyDaily : null,
             today: _today,
+            dailyHook: DailyInfo.of(
+              _storage,
+              _today,
+            ).summaryHook(widget.clock()),
             onReplay: () {
               _closePanel();
               _restart();
@@ -1245,6 +1266,7 @@ class _GameScreenState extends State<GameScreen>
             onStar: (_) => _sfx.play(Sfx.star),
             onFinished: () {
               if (result.leveledUp) _sfx.play(Sfx.levelUp);
+              _warmNextLevel();
             },
           ),
         ),
