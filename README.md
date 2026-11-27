@@ -163,7 +163,7 @@ Roboto (Regular, Medium, Bold, Black) is bundled in `assets/fonts/` so web build
   puzzle/streak rules and album sets.
 - `lib/src/share/` - clipboard copy with a web `execCommand` fallback.
 - `lib/src/ui/` - board painter and effects, game screen, overlays.
-- `lib/src/audio/` - sound effects and music loop (web HTML audio, native channel) and the mute store.
+- `lib/src/audio/` - sound effects and music loop (web Web Audio, native channel) and the mute store.
 - `lib/src/storage.dart` - local persistence (shared_preferences, v1 migration).
 - `harness/` - spec, ADRs, rules and contracts used for spec-driven work.
 
