@@ -1222,32 +1222,43 @@ class ThemeOverlay extends StatelessWidget {
       palette: p,
       maxWidth: 520,
       cardKey: const Key('themes'),
-      child: SingleChildScrollView(
+      // The header and its close button stay pinned while themes scroll.
+      child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 12, 8, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _Header('Paper themes', p, onClose),
-            Text(
-              'Earn XP by solving puzzles to unlock new paper.',
-              style: TextStyle(color: p.panelSubtle, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final t in NonoTheme.values)
-                  _ThemeCard(
-                    theme: t,
-                    palette: p,
-                    locked: !t.unlockedAt(painterLevel),
-                    active: t == current,
-                    selected: t == selected,
-                    onTap: () => onPick(t),
-                  ),
-              ],
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Earn XP by solving puzzles to unlock new paper.',
+                      style: TextStyle(color: p.panelSubtle, fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        for (final t in NonoTheme.values)
+                          _ThemeCard(
+                            theme: t,
+                            palette: p,
+                            locked: !t.unlockedAt(painterLevel),
+                            active: t == current,
+                            selected: t == selected,
+                            onTap: () => onPick(t),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

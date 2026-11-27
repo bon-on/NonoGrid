@@ -101,68 +101,86 @@ class HowToPlayOverlay extends StatelessWidget {
                 palette: p,
                 tape: true,
                 padding: EdgeInsets.zero,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'How to play',
-                        style: TextStyle(
-                          color: p.panelText,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        width: 68,
-                        height: 68,
-                        decoration: BoxDecoration(
-                          color: p.accent,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: p.panelBorder, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: p.panelBorder,
-                              offset: const Offset(0, 3),
+                // Skip and Next stay pinned below the scrolling step so
+                // short or landscape phones can always leave the card.
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'How to play',
+                              style: TextStyle(
+                                color: p.panelText,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              width: 68,
+                              height: 68,
+                              decoration: BoxDecoration(
+                                color: p.accent,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: p.panelBorder,
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: p.panelBorder,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(s.icon, size: 36, color: p.accentInk),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              s.text,
+                              key: const Key('how-to-play-text'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: p.panelText,
+                                fontSize: 16,
+                                height: 1.35,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (var i = 0; i < steps.length; i++)
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: i == step ? 20 : 8,
+                                    height: 8,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(4),
+                                      color: i == step
+                                          ? p.accent
+                                          : p.panelBorder.withValues(
+                                              alpha: 0.25,
+                                            ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ],
                         ),
-                        child: Icon(s.icon, size: 36, color: p.accentInk),
                       ),
-                      const SizedBox(height: 14),
-                      Text(
-                        s.text,
-                        key: const Key('how-to-play-text'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: p.panelText,
-                          fontSize: 16,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          for (var i = 0; i < steps.length; i++)
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: i == step ? 20 : 8,
-                              height: 8,
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(4),
-                                color: i == step
-                                    ? p.accent
-                                    : p.panelBorder.withValues(alpha: 0.25),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           PaperButton(
@@ -181,8 +199,8 @@ class HowToPlayOverlay extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
