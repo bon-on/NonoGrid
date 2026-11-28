@@ -18,16 +18,18 @@ required_evidence:
 
 ## Problem
 GamePix accepts HTML5 games that load only their own relative resources and
-use no third-party SDK. The CrazyGames bundle ships the CrazyGames SDK script
+use no third-party SDK (superseded: see feature-gamepix-sdk). The CrazyGames bundle ships the CrazyGames SDK script
 and Flutter web fetches Roboto from fonts.gstatic.com at runtime, so neither
 can be uploaded to GamePix as is.
 
 ## Scope
-- `--dart-define=GAMEPIX=true` selects the no-op `GamePlatform`. It wins over
+- `--dart-define=GAMEPIX=true` selects the GamePix SDK adapter
+  (feature-gamepix-sdk; originally the no-op `GamePlatform`). It wins over
   `CRAZYGAMES`; the CrazyGames adapter is selected only when `CRAZYGAMES=true`
   and `GAMEPIX` is not set.
 - `GamePlatform.allowsAds` and `allowsResultRegistration` are `false` (this
-  game has no ads, leaderboard or result upload, and no hub navigation bar).
+  game has no leaderboard or result upload, and no hub navigation bar). Break
+  ads between puzzles come from feature-gamepix-sdk.
 - Roboto (400/500/700/900) is bundled in `assets/fonts/` for every build, so
   no build requests fonts.gstatic.com for Roboto. The license file sits next to it.
 - `web/index.html`: viewport meta with `user-scalable=no`, `touch-action: none`,
@@ -36,20 +38,21 @@ can be uploaded to GamePix as is.
   `build/nono-grid-gamepix.zip` (index.html at the zip root) with relative
   `<base href="./">`, no CrazyGames SDK script, no outbound URLs, Roboto in
   `FontManifest.json`.
-- Progress is stored in localStorage through shared_preferences, which GamePix
-  syncs automatically. No code is needed (see `docs/gamepix.md`).
+- Progress is stored in one named localStorage item (feature-gamepix-sdk, see
+  `docs/gamepix.md`).
 - UI strings use only characters Roboto covers (ASCII). `tool/build_gamepix.sh`
   fails on non-ASCII characters in `lib/**/*.dart`, because a missing glyph makes
   Flutter fetch a fallback font from fonts.gstatic.com.
   NonoGrid: the U+00B7 separators in the hint line were replaced by `-`.
 
-Out of scope: GamePix SDK integration, ads, gameplay changes, portal submission.
+Out of scope: gameplay changes, portal submission. The GamePix SDK and ads are
+specified in feature-gamepix-sdk.
 
 ## Acceptance Criteria
 - `flutter analyze` and `flutter test` pass.
 - `flutter test --platform chrome test/web` passes with and without
   `--dart-define=GAMEPIX=true --dart-define=CRAZYGAMES=true`; with GAMEPIX the
-  platform is the no-op one, never the CrazyGames adapter.
+  platform is the GamePix adapter, never the CrazyGames adapter.
 - `tool/build_gamepix.sh` passes its self-checks and `main.dart.js` has no
   `crazygames` string.
 - `tool/build_crazygames.sh` and the Pages build still work.
@@ -74,3 +77,9 @@ Out of scope: GamePix SDK integration, ads, gameplay changes, portal submission.
 The GamePix bundle is built with `--wasm` (JavaScript fallback kept). The
 `crazygames` / `bon-on.github.io` string checks cover `main.dart.js`,
 `main.dart.wasm` and `main.dart.mjs`.
+
+## Update 2026-11-28 (feature-gamepix-sdk)
+
+The "SDK-free, no ads" statements above are superseded: the GamePix build now
+integrates the GamePix SDK v3 with break ads between puzzles. See
+feature-gamepix-sdk and adr-gamepix-sdk. All other rules here still apply.

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Builds the GamePix upload bundle (no portal SDK): build/gamepix/ and
-# build/nono-grid-gamepix.zip. See docs/gamepix.md.
+# Builds the GamePix upload bundle: build/gamepix/ and
+# build/nono-grid-gamepix.zip. The only third-party script is the GamePix SDK
+# v3 (feature-gamepix-sdk): no other scripts, no external links, no other
+# network access. See docs/gamepix.md.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -28,6 +30,27 @@ perl -pi -e 's#--games-nav-height: calc\([^;]*\);#--games-nav-height: 0px;#' "$I
 if grep -q -e 'games-nav-bar"' "$INDEX"; then echo "error: hub navigation bar still present in index.html" >&2; exit 1; fi
 grep -q -e '--games-nav-height: 0px;' "$INDEX" || { echo "error: hub navigation height was not reset" >&2; exit 1; }
 
+# GamePix SDK with manual lifecycle, loaded in <head> before the Flutter
+# bootstrap so localStorage sync is active from the game's first read.
+SDK_URL="https://integration.gamepix.com/sdk/v3/gamepix.sdk.js"
+SDK_TAG="<script src=\"$SDK_URL\"></script>"
+CONFIG_TAG="<script>window.GamePixConfig = { lifecycle: 'manual' };</script>"
+perl -pi -e "s#^(\\s*)</head>#\$1  $CONFIG_TAG\n\$1  $SDK_TAG\n\$1</head>#" "$INDEX"
+if [ "$(grep -c -F "$SDK_TAG" "$INDEX")" != 1 ] || [ "$(grep -c -F "$CONFIG_TAG" "$INDEX")" != 1 ]; then
+  echo "error: GamePix SDK script or manual lifecycle config missing or duplicated" >&2
+  exit 1
+fi
+config_line=$(grep -n -m1 -F "$CONFIG_TAG" "$INDEX" | cut -d: -f1 || true)
+sdk_line=$(grep -n -m1 -F "$SDK_TAG" "$INDEX" | cut -d: -f1 || true)
+boot_line=$(grep -n -m1 -F '<script src="flutter_bootstrap.js"' "$INDEX" | cut -d: -f1 || true)
+if [[ -z "$config_line" || -z "$sdk_line" || -z "$boot_line" ]] \
+  || ! { [ "$config_line" -lt "$sdk_line" ] && [ "$sdk_line" -lt "$boot_line" ]; }; then
+  echo "error: GamePix config and SDK must precede the Flutter bootstrap" >&2
+  exit 1
+fi
+# Every other check sees the page without the SDK tag.
+INDEX_NO_SDK="$(grep -v -F "$SDK_TAG" "$INDEX")"
+
 fail() { echo "error: $1" >&2; exit 1; }
 
 # Glyphs Roboto lacks make Flutter fetch a fallback font from fonts.gstatic.com.
@@ -39,9 +62,10 @@ grep -q '<base href="./">' "$INDEX" || fail "relative base href missing"
 grep -q -e 'user-select: none' "$INDEX" || fail "user-select rule missing from index.html"
 grep -q -e 'user-scalable=no' "$INDEX" || fail "viewport user-scalable=no missing"
 grep -q -e 'touch-action: none' "$INDEX" || fail "touch-action rule missing"
-if grep -q -e 'crazygames-sdk' "$INDEX"; then fail "CrazyGames SDK script present"; fi
-if grep -q -e 'bon-on.github.io' "$INDEX"; then fail "outbound hub link present in index.html"; fi
-if grep -Eq -e '(src|href)="https?://' "$INDEX"; then fail "external resource in index.html"; fi
+if grep -q -i -e 'crazygames' <<<"$INDEX_NO_SDK"; then fail "CrazyGames SDK reference present"; fi
+if grep -q -e 'bon-on.github.io' <<<"$INDEX_NO_SDK"; then fail "outbound hub link present in index.html"; fi
+if grep -q -E '<script[^>]+src="(https?:)?//' <<<"$INDEX_NO_SDK"; then fail "index.html must not load scripts other than the GamePix SDK"; fi
+if grep -Eq -e '(src|href|action)="(https?:)?//' <<<"$INDEX_NO_SDK"; then fail "external resource in index.html"; fi
 grep -q '"family":"Roboto"' "$OUT/assets/FontManifest.json" || fail "Roboto missing from FontManifest.json"
 
 # Renderer files: the loader picks skwasm (or skwasm_heavy on Chromium builds

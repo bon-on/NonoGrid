@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,26 +23,49 @@ class _FakePlatform extends GamePlatform {
   void gameplayStop() => events.add('stop');
 }
 
-Future<_FakePlatform> _launch(
+/// Break-ad platform like GamePix: the ad ends when [adDone] completes.
+class _AdPlatform extends _FakePlatform {
+  Completer<void>? adDone;
+  int ads = 0;
+  void Function(bool paused)? pauseListener;
+
+  @override
+  bool get showsRunBreakAds => true;
+
+  @override
+  Future<void> showRunBreakAd() {
+    ads++;
+    events.add('ad');
+    return (adDone = Completer<void>()).future;
+  }
+
+  @override
+  void setPauseListener(void Function(bool paused)? listener) {
+    pauseListener = listener;
+  }
+}
+
+Future<T> _launch<T extends _FakePlatform>(
   WidgetTester t, {
   required bool tutorialSeen,
+  T? platform,
 }) async {
   t.view.physicalSize = const Size(1280, 720);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
   SharedPreferences.setMockInitialValues({'level': 1});
   final storage = await GameStorage.open();
-  final platform = _FakePlatform();
+  final fake = platform ?? _FakePlatform() as T;
   await t.pumpWidget(
     NonoGridApp(
       storage: storage,
       tutorialStore: MemoryTutorialStore(seen: tutorialSeen),
-      platform: platform,
+      platform: fake,
     ),
   );
   await t.pump();
   await t.pump();
-  return platform;
+  return fake;
 }
 
 Future<void> _solveLevel1(WidgetTester t) async {
@@ -149,6 +174,68 @@ void main() {
     await t.tap(find.text('Next'));
     await t.pumpAndSettle();
     expect(find.text('Level 2'), findsOneWidget);
+    expect(platform.events, ['start', 'stop', 'start']);
+  });
+
+  testWidgets('break ad runs before the next puzzle, never mid-puzzle', (
+    t,
+  ) async {
+    final platform = await _launch(
+      t,
+      tutorialSeen: true,
+      platform: _AdPlatform(),
+    );
+    // Mid-puzzle actions never ask for an ad.
+    await t.tap(find.text('Restart'));
+    await t.pump();
+    expect(platform.ads, 0);
+
+    await _solveLevel1(t);
+    expect(find.textContaining('Solved in'), findsOneWidget);
+    expect(platform.ads, 0, reason: 'solving shows no ad');
+
+    await t.tap(find.text('Next'));
+    await t.pump();
+    expect(platform.ads, 1);
+    expect(find.text('Level 1'), findsOneWidget, reason: 'waits for the ad');
+
+    // Double taps and keys during the ad neither repeat it nor skip it.
+    await t.tap(find.text('Next'), warnIfMissed: false);
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pump();
+    expect(platform.ads, 1);
+    expect(find.text('Level 1'), findsOneWidget);
+
+    platform.adDone!.complete();
+    await t.pumpAndSettle();
+    expect(find.text('Level 2'), findsOneWidget);
+    expect(platform.ads, 1);
+    expect(platform.events, ['start', 'stop', 'ad', 'start']);
+  });
+
+  testWidgets('without break ads Next goes straight to the next puzzle', (
+    t,
+  ) async {
+    final platform = await _launch(t, tutorialSeen: true);
+    await _solveLevel1(t);
+    await t.tap(find.text('Next'));
+    await t.pumpAndSettle();
+    expect(find.text('Level 2'), findsOneWidget);
+    expect(platform.showsRunBreakAds, isFalse);
+  });
+
+  testWidgets('portal pause and resume stop and restart gameplay', (t) async {
+    final platform = await _launch(
+      t,
+      tutorialSeen: true,
+      platform: _AdPlatform(),
+    );
+    expect(platform.events, ['start']);
+    platform.pauseListener!(true);
+    await t.pump();
+    expect(platform.events, ['start', 'stop']);
+    platform.pauseListener!(false);
+    await t.pump();
     expect(platform.events, ['start', 'stop', 'start']);
   });
 }

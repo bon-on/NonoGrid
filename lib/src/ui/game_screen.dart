@@ -250,12 +250,21 @@ class _GameScreenState extends State<GameScreen>
   (int, int) _strokeOrigin = (0, 0);
 
   bool get _overlayOpen => _tutorialOpen || _panel != _Panel.none;
-  bool get _inputBlocked => !_appActive || !_tutorialChecked || _overlayOpen;
+  bool get _inputBlocked =>
+      !_appActive || !_tutorialChecked || _overlayOpen || _breakAdInProgress;
 
-  // Whether the platform currently believes gameplay is running.
-  bool _appActive =
+  /// A break ad runs between two puzzles (feature-gamepix-sdk): input and
+  /// repeated taps on the buttons wait for it.
+  bool _breakAdInProgress = false;
+
+  // Tab visibility and the portal's pause request both stop the game.
+  bool _lifecycleActive =
       WidgetsBinding.instance.lifecycleState == null ||
       WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+  bool _portalPaused = false;
+  late bool _appActive = _lifecycleActive;
+
+  // Whether the platform currently believes gameplay is running.
   bool _gameplayActive = false;
 
   /// Reports gameplay start/stop to the platform exactly on transitions.
@@ -287,6 +296,7 @@ class _GameScreenState extends State<GameScreen>
     _checkTutorial();
     _loadSoundMuted();
     widget.platform.setAudioMuteListener(_sfx.refreshMute);
+    widget.platform.setPauseListener(_onPortalPause);
   }
 
   Future<void> _loadSoundMuted() async {
@@ -633,6 +643,7 @@ class _GameScreenState extends State<GameScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.platform.setAudioMuteListener(null);
+    widget.platform.setPauseListener(null);
     _ticker?.cancel();
     _mistakeTimer?.cancel();
     _messageTimer?.cancel();
@@ -649,10 +660,25 @@ class _GameScreenState extends State<GameScreen>
   /// and saves the elapsed time so a reload does not lose it.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _appActive = state == AppLifecycleState.resumed;
-    _sfx.setAppVisible(_appActive);
+    _lifecycleActive = state == AppLifecycleState.resumed;
+    _applyActive();
+  }
+
+  /// Portal pause/resume (GamePix Player overlays and ads): stops the clock
+  /// and input like a hidden tab.
+  void _onPortalPause(bool paused) {
+    if (!mounted) return;
+    _portalPaused = paused;
+    _applyActive();
+  }
+
+  void _applyActive() {
+    final active = _lifecycleActive && !_portalPaused;
+    if (active == _appActive) return;
+    _appActive = active;
+    _sfx.setAppVisible(active);
     _syncGameplay();
-    if (state == AppLifecycleState.resumed) {
+    if (active) {
       if (_wasRunning && !_overlayOpen) _startClock();
       _wasRunning = false;
     } else if (_clock.isRunning) {
@@ -817,7 +843,36 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Next button / Enter after a win.
+  /// Next level (or back to the levels after a daily). The only way to start
+  /// another puzzle from a finished one, so it is the single ad break point
+  /// (feature-gamepix-sdk): the break ad plays first where the platform has
+  /// one, never while a puzzle is being played.
   void _advance() {
+    if (!_game.isWon) return;
+    if (!widget.platform.showsRunBreakAds) {
+      _advanceNow();
+      return;
+    }
+    unawaited(_advanceAfterBreakAd());
+  }
+
+  Future<void> _advanceAfterBreakAd() async {
+    if (_breakAdInProgress) return;
+    final generation = _boardGeneration;
+    setState(() => _breakAdInProgress = true);
+    try {
+      await widget.platform.showRunBreakAd();
+    } catch (_) {
+      // A failed ad never keeps the player from the next puzzle.
+    }
+    if (!mounted) return;
+    setState(() => _breakAdInProgress = false);
+    // The board may have changed while the ad ran (should not happen with
+    // input blocked); only advance from the same finished puzzle.
+    if (generation == _boardGeneration && _game.isWon) _advanceNow();
+  }
+
+  void _advanceNow() {
     if (_dailyDay != null) {
       _backToLevels();
     } else {
@@ -1029,6 +1084,11 @@ class _GameScreenState extends State<GameScreen>
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is KeyDownEvent) _onAnyInput();
+    if (_breakAdInProgress) {
+      return _isBrowserShortcut(event)
+          ? KeyEventResult.ignored
+          : KeyEventResult.handled;
+    }
     if (_tutorialOpen) {
       if (_isBrowserShortcut(event)) return KeyEventResult.ignored;
       if (event is KeyDownEvent) {
@@ -1189,22 +1249,25 @@ class _GameScreenState extends State<GameScreen>
       child: ExcludeFocus(
         child: Scaffold(
           backgroundColor: p.deskBottom,
-          body: Listener(
-            onPointerDown: (_) => _onAnyInput(),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: DeskScenery(palette: p, showProps: wide),
-                ),
-                SafeArea(
-                  child: switch (layout) {
-                    ScreenLayout.wide => _scaledWideLayout(p),
-                    ScreenLayout.compact => _compactLayout(p, size),
-                    ScreenLayout.stacked => _narrowLayout(p, size),
-                  },
-                ),
-                ..._overlays(p),
-              ],
+          body: AbsorbPointer(
+            absorbing: _breakAdInProgress,
+            child: Listener(
+              onPointerDown: (_) => _onAnyInput(),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: DeskScenery(palette: p, showProps: wide),
+                  ),
+                  SafeArea(
+                    child: switch (layout) {
+                      ScreenLayout.wide => _scaledWideLayout(p),
+                      ScreenLayout.compact => _compactLayout(p, size),
+                      ScreenLayout.stacked => _narrowLayout(p, size),
+                    },
+                  ),
+                  ..._overlays(p),
+                ],
+              ),
             ),
           ),
         ),

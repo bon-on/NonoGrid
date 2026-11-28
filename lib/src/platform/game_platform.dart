@@ -6,12 +6,14 @@ import 'game_platform_factory_stub.dart'
 ///
 /// Mobile and plain web builds use [NoopGamePlatform]; CrazyGames web builds
 /// (`--dart-define=CRAZYGAMES=true`) use the SDK-backed implementation.
-/// GamePix web builds (`--dart-define=GAMEPIX=true`) use the no-op platform.
+/// GamePix web builds (`--dart-define=GAMEPIX=true`) use the GamePix SDK
+/// adapter (feature-gamepix-sdk).
 abstract class GamePlatform {
   const GamePlatform();
 
-  /// Whether the game may show ads. This game has none; kept false so a
-  /// portal build can never enable them by accident.
+  /// Whether the game may show banner-style ads. This game has none; kept false
+  /// so a portal build can never enable them by accident. Break ads between
+  /// puzzles are [showsRunBreakAds].
   bool get allowsAds => false;
 
   /// Whether finished results may be sent to an external service. This game
@@ -25,6 +27,18 @@ abstract class GamePlatform {
   /// Registers a callback for [isAudioMuted] changes (null clears it), so
   /// music can stop or resume as soon as the portal setting flips.
   void setAudioMuteListener(void Function()? listener) {}
+
+  /// Registers a callback for portal pause/resume requests (GamePix Player
+  /// overlays and ads). Platforms without such events ignore it.
+  void setPauseListener(void Function(bool paused)? listener) {}
+
+  /// Whether [showRunBreakAd] may show an ad, so callers only wait for it on
+  /// such platforms (feature-gamepix-sdk).
+  bool get showsRunBreakAds => false;
+
+  /// Shows an ad between puzzles. Completes when the ad ends, fails or is
+  /// skipped (cooldown), so callers can always continue afterwards.
+  Future<void> showRunBreakAd() async {}
 
   /// Prepares the portal SDK. Never throws; failures downgrade to no-op.
   Future<void> initialize();

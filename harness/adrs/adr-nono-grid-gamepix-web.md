@@ -1,6 +1,6 @@
 ---
 id: adr-nono-grid-gamepix-web
-title: Select the GamePix build with a GAMEPIX flag and the no-op platform
+title: Select the GamePix build with a GAMEPIX flag
 status: accepted
 related_specs:
   - feature-daily-puzzle
@@ -11,21 +11,24 @@ related_specs:
   - feature-large-screen-scale
 ---
 
-# ADR: Select the GamePix build with a GAMEPIX flag and the no-op platform
+# ADR: Select the GamePix build with a GAMEPIX flag
 
 ## Context
-GamePix forbids third-party SDKs and external requests. The CrazyGames build
+GamePix first accepted only SDK-free games with no external requests
+(superseded by adr-gamepix-sdk, which adds the GamePix SDK v3). The CrazyGames build
 already exists and uses `CRAZYGAMES=true`. Flutter web also downloads Roboto
 from fonts.gstatic.com unless a Roboto family is bundled.
 
 ## Decision
-- `bool.fromEnvironment('GAMEPIX')` selects `NoopGamePlatform`; it takes
+- `bool.fromEnvironment('GAMEPIX')` selects the GamePix platform (first the
+  no-op `NoopGamePlatform`, now `GamePixPlatform` per adr-gamepix-sdk); it takes
   precedence over `CRAZYGAMES`. Both are compile-time constants, so the
   CrazyGames adapter is tree-shaken out of the GamePix bundle.
 - `GamePlatform` exposes `allowsAds` and `allowsResultRegistration`, both false.
 - Roboto is bundled in every build instead of only the portal build, so all
   builds behave the same.
-- `tool/build_gamepix.sh` adds no SDK script and verifies the result.
+- `tool/build_gamepix.sh` adds no CrazyGames SDK script and verifies the
+  result (it now also injects the GamePix SDK, see adr-gamepix-sdk).
 
 ## Alternatives
 - Reuse the CrazyGames build: ships the CrazyGames SDK, rejected by GamePix.

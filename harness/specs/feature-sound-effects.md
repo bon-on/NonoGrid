@@ -42,7 +42,8 @@ CrazyGames, GamePix) and on iOS/Android, and a way to turn them off.
 - Mute: user toggle persisted in `shared_preferences` key `sound_muted_v1`
   (default on). Effective mute = user mute OR `GamePlatform.isAudioMuted`
   (CrazyGames SDK `game.settings.muteAudio`, updated through
-  `addSettingsChangeListener`; the game has no ads; no-op platform: false).
+  `addSettingsChangeListener`; GamePix SDK pause and soundOff, including during GamePix
+  interstitials, feature-gamepix-sdk; no-op platform: false).
 - A sound button (`Icons.volume_up_rounded` / `Icons.volume_off_rounded`,
   tooltip "Sound on"/"Sound off") sits next to the "?" button in the top bar,
   with the same style. Like "?" it is covered by the tutorial scrim while the

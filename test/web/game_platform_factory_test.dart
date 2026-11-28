@@ -7,6 +7,7 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nono_grid/src/platform/crazygames_platform.dart';
 import 'package:nono_grid/src/platform/game_platform.dart';
+import 'package:nono_grid/src/platform/gamepix_platform.dart';
 import 'package:nono_grid/src/share/result_copy_web.dart';
 
 void main() {
@@ -17,7 +18,7 @@ void main() {
     final platform = createGamePlatform();
     if (gamePix) {
       // GAMEPIX wins even when CRAZYGAMES is also set.
-      expect(platform, isA<NoopGamePlatform>());
+      expect(platform, isA<GamePixPlatform>());
       expect(platform, isNot(isA<CrazyGamesPlatform>()));
     } else if (crazyGames) {
       expect(platform, isA<CrazyGamesPlatform>());

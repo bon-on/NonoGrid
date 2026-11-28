@@ -1,15 +1,27 @@
 import 'crazygames_platform.dart';
 import 'game_platform.dart';
+import 'gamepix_platform.dart';
 
 const bool _crazyGamesBuild = bool.fromEnvironment('CRAZYGAMES');
 const bool _gamePixBuild = bool.fromEnvironment('GAMEPIX');
 
-/// GAMEPIX (`--dart-define=GAMEPIX=true`) wins over CRAZYGAMES and uses the
-/// no-op platform, so the GamePix bundle contains no SDK adapter at all.
-/// Both flags are compile-time constants so the unused branch is tree-shaken.
-/// GamePix gets no share link (no outbound URLs in that bundle).
+/// Picks the portal adapter from explicit flags; GAMEPIX wins over
+/// CRAZYGAMES (feature-gamepix-sdk). Used by tests only: the build itself goes
+/// through [createGamePlatform], whose constant flags let the compiler drop
+/// the unused adapters (the GamePix bundle has no CrazyGames code and the
+/// CrazyGames bundle no GamePix code). GamePix gets no share link (no
+/// outbound URLs in that bundle).
+GamePlatform selectGamePlatform({
+  required bool crazyGames,
+  required bool gamePix,
+}) {
+  if (gamePix) return GamePixPlatform();
+  if (crazyGames) return CrazyGamesPlatform();
+  return const NoopGamePlatform(shareLink: pagesShareLink);
+}
+
 GamePlatform createGamePlatform() => _gamePixBuild
-    ? const NoopGamePlatform()
+    ? GamePixPlatform()
     : _crazyGamesBuild
     ? CrazyGamesPlatform()
     : const NoopGamePlatform(shareLink: pagesShareLink);

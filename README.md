@@ -5,7 +5,8 @@ The seed is saved, so reopening, restarting or replaying keeps the same puzzle.
 Every puzzle is uniquely solvable by line logic alone, so you never have to guess.
 
 Runs in the browser (GitHub Pages) and on iOS/Android. No ads, no network,
-no accounts; progress is stored locally on the device.
+no accounts; progress is stored locally on the device. (Only the GamePix portal
+build loads the GamePix SDK and shows its ads between puzzles.)
 
 ## How to play
 
@@ -143,7 +144,7 @@ the source in the repository settings).
 
 ## GamePix build
 
-`tool/build_gamepix.sh` builds `build/nono-grid-gamepix.zip` for GamePix (no portal SDK, no ads, relative resources). See `docs/gamepix.md`.
+`tool/build_gamepix.sh` builds `build/nono-grid-gamepix.zip` for GamePix (GamePix SDK v3 with an ad between puzzles, relative resources). See `docs/gamepix.md`.
 
 ## Sounds
 

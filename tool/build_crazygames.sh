@@ -80,6 +80,14 @@ for font in "${fonts[@]}"; do
   if (( size > 60000 )); then echo "error: $font is not the subset font (tool/subset_fonts.sh)" >&2; exit 1; fi
 done
 
+# The GamePix adapter is tree-shaken from this bundle (feature-gamepix-sdk).
+for f in "$OUT/main.dart.js" "$OUT/main.dart.wasm" "$OUT/main.dart.mjs"; do
+  if [ -f "$f" ] && grep -q -a 'GamePix' "$f"; then
+    echo "error: GamePix adapter code found in the CrazyGames $(basename "$f")" >&2
+    exit 1
+  fi
+done
+
 # Debug symbol files are not needed at runtime.
 find "$OUT" -name '*.symbols' -delete
 

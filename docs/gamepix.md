@@ -1,8 +1,9 @@
 # GamePix build
 
-Building with `--dart-define=GAMEPIX=true` produces an SDK-free bundle for GamePix:
-no portal SDK script, no ads, no leaderboard or result upload, no hub link, and
-no external requests (Roboto is bundled in `assets/fonts/`).
+Building with `--dart-define=GAMEPIX=true` produces a GamePix SDK v3 bundle
+(feature-gamepix-sdk): the GamePix SDK is the only external script, there is no
+CrazyGames SDK, no leaderboard or result upload, no hub link, no share link, and
+no other external requests (Roboto is bundled in `assets/fonts/`).
 
 ## Build
 
@@ -19,7 +20,9 @@ The script runs `flutter build web --release --wasm --base-href / --no-web-resou
 --dart-define=GAMEPIX=true` (WebAssembly on Chromium browsers, JavaScript elsewhere and as a fallback; see
 `adr-web-wasm-portal-build`), switches `<base href>` to `./`, removes `*.symbols` and the
 unused `wimp.*` renderer and checks: both builds and the JavaScript retry present, subset
-fonts, relative base, no `crazygames-sdk`, no `bon-on.github.io`, no external
+fonts, relative base, the GamePix `GamePixConfig` (`lifecycle: 'manual'`) and SDK
+script present exactly once and in that order before `flutter_bootstrap.js`, no
+`crazygames`, no `bon-on.github.io`, no other script and no external
 `src`/`href` in `index.html`, viewport `user-scalable=no`, Roboto in
 `FontManifest.json`, no `crazygames` / `bon-on.github.io` in `main.dart.js`,
 `main.dart.wasm` or `main.dart.mjs`, and `index.html` at the zip root. It prints file count and size.
@@ -33,20 +36,35 @@ fonts, relative base, no `crazygames-sdk`, no `bon-on.github.io`, no external
 | Cover | 1360x850 (not created yet) |
 | Orientation | portrait and landscape; the layout fits any iframe size |
 | Desktop / Mobile friendly | both (mouse, touch and keyboard) |
-| SDK integration | none |
+| SDK integration | GamePix SDK v3 (manual lifecycle, pause/resume, interstitial between puzzles) |
 | Language | English |
 | Description / controls | see `reports/store-listing-2026-11.md` (same texts as CrazyGames) |
 
+## GamePix SDK
+
+- `tool/build_gamepix.sh` adds `window.GamePixConfig = { lifecycle: 'manual' }` and
+  `https://integration.gamepix.com/sdk/v3/gamepix.sdk.js` to `<head>`, before the Flutter bootstrap.
+- `GamePixPlatform` (`lib/src/platform/gamepix_platform.dart`): `pause`/`resume` stop the
+  puzzle timer and input and mute audio; `soundOff`/`soundOn` mute; `lifecycle.loaded()`
+  after the first frame; `lifecycle.gameStart()` when play starts.
+- Ads: one interstitial when the player leaves a solved puzzle through Next (or Levels after
+  a daily puzzle), at most every 2 minutes, never mid-puzzle. A failed ad never blocks the game.
+- Without the SDK (blocked script) the game runs without ads.
+
 ## Saved progress
 
-Progress is saved in the browser's localStorage through `shared_preferences`.
-GamePix syncs localStorage automatically, so no SDK code is required.
+Progress lives in one localStorage item, `nonogrid.prefs_v1`, read and written by name through
+`CloudPrefsStore`, because GamePix syncs localStorage items it reads with `getItem` by key
+(shared_preferences_web only lists keys). Progress saved before the SDK is copied into it on the
+first session.
 
 ## Platform flags
 
-`GAMEPIX=true` selects the no-op `GamePlatform` (`allowsAds` and
-`allowsResultRegistration` are false). It wins over `CRAZYGAMES=true`; the CrazyGames
-adapter is only used when `CRAZYGAMES=true` and `GAMEPIX` is not set.
+`GAMEPIX=true` selects `GamePixPlatform` (`allowsAds` and `allowsResultRegistration` stay
+false; no share link). It wins over `CRAZYGAMES=true`; the CrazyGames adapter is only used
+when `CRAZYGAMES=true` and `GAMEPIX` is not set. Both flags are compile-time constants, so
+each bundle drops the other adapter (`tool/build_crazygames.sh` fails if `GamePix` appears in
+its `main.dart.js`).
 
 ## Tests
 

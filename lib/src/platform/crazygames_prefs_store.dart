@@ -190,7 +190,7 @@ class CloudPrefsStore extends SharedPreferencesStorePlatform {
         jsonEncode(<String, Object?>{...stamp, 'values': _values}),
       );
     } catch (error) {
-      debugPrint('CrazyGames data save failed: $error');
+      debugPrint('Cloud data save failed: $error');
     }
   }
 

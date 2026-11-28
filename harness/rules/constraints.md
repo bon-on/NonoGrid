@@ -10,7 +10,9 @@
 
 - Stack: Flutter (stable 3.41+), Dart 3.11; targets web, iOS, Android.
 - Dependencies: Flutter SDK and `shared_preferences` only. No ads SDK, no
-  network calls, no analytics, no leaderboard in v1.
+  network calls, no analytics, no leaderboard in v1, except the portal SDK of a
+  portal build (CrazyGames, and the GamePix SDK v3 with GamePix interstitials per
+  adr-gamepix-sdk).
 - Game rules, solver and generator stay widget-free in `lib/src/logic/` and
   are covered by unit tests in `test/`.
 - Every shipped puzzle must be fully solvable by the line solver
